@@ -47,6 +47,16 @@ def get_trip_categories():
     categories = ["Backpacker", "Standard", "Luxury"]
     return categories
 
+@app.get("/api/v1/recommendations")
+def get_recommendations():
+    recommendations = ["Tokyo Tower", "Shibuya", "Mount Fuji"]
+    return recommendations
+
+@app.get("/api/v1/transportations")
+def get_transportations():
+    transportations = ["Bus", "Train", "Flight"]
+    return transportations
+
 # def print_trip_summary(destinations, country, days, budget, currency, travel_month, daily, category):
 #     print("===================")
 #     print("KelanaAI")
