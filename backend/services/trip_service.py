@@ -18,9 +18,11 @@ def get_transportation_recommendation(category):
         return "Flight"
 
 def get_season(travel_month):
-    if travel_month.lower() == "December" or "12":
-        return("Peak Season")
-    elif travel_month.lower() == "June" or "6":
-        return("Holiday Season")
+    month = travel_month.strip().lower()
+
+    if month in ("december", "12"):
+        return "Peak Season"
+    elif month in ("june", "6"):
+        return "Holiday Season"
     else:
-        return("Regular Season")
+        return "Regular Season"
