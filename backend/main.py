@@ -1,4 +1,5 @@
 from services.trip_service import calculate_total_cost, calculate_daily_budget, get_trip_category, get_transportation_recommendation, get_season
+from services.bedrock_service import get_ai_recommendations
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -125,7 +126,6 @@ def update_trip(trip_id: int, request: TripRequest):
             detail=f"Trip with id {trip_id} not found"
         )
 
-
     daily_budget = calculate_daily_budget(request.budget, request.days)
     total_estimated_cost = calculate_total_cost(
         request.hotel_cost,
@@ -133,7 +133,6 @@ def update_trip(trip_id: int, request: TripRequest):
         request.food_cost,
         request.miscellaneous_cost,
     )
-
     trip.hotel_cost = request.hotel_cost
     trip.transportation_cost = request.transportation_cost
     trip.food_cost = request.food_cost
@@ -160,6 +159,46 @@ def update_trip(trip_id: int, request: TripRequest):
     db.close()
 
     return trip
+
+
+@app.post("/api/v1/trips/{trip_id}/generate")
+def generate_ai_recommendations(trip_id: int):
+    db = SessionLocal()
+    trip = db.query(Trip).filter(Trip.id == trip_id).first()
+
+    if trip is None:
+        db.close()
+        raise HTTPException(
+            status_code=404,
+            detail=f"Trip with id {trip_id} not found",
+        )
+
+    try:
+        recommendation = get_ai_recommendations(
+            days=trip.days,
+            destinations=trip.destinations,
+            country=trip.country,
+            currency=trip.currency,
+            budget=trip.budget,
+            travel_style=trip.travel_style,
+            travel_month=trip.travel_month,
+        )
+        trip.ai_recommendations = recommendation
+        db.commit()
+        return {
+            "trip_id": trip.id,
+            "destination": trip.destinations,
+            "country": trip.country,
+            "recommendation": recommendation,
+        }
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI recommendation generation failed: {error}",
+        ) from error
+    finally:
+        db.close()
 
 @app.get("/api/v1/trip-categories")
 def get_trip_categories():

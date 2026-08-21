@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, Float, JSON, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, Float, JSON, Text, DateTime
 from sqlalchemy.sql import func
 
 from database import Base
@@ -26,3 +26,4 @@ class Trip(Base):
     season = Column(String, nullable=False)
     travel_style = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default = func.now(), nullable=False)
+    ai_recommendations = Column(Text, nullable=True)
