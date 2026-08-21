@@ -199,18 +199,3 @@ def generate_ai_recommendations(trip_id: int):
         ) from error
     finally:
         db.close()
-
-@app.get("/api/v1/trip-categories")
-def get_trip_categories():
-    categories = ["Backpacker", "Standard", "Luxury"]
-    return categories
-
-@app.get("/api/v1/recommendations")
-def get_recommendations():
-    recommendations = ["Tokyo Tower", "Shibuya", "Mount Fuji"]
-    return recommendations
-
-@app.get("/api/v1/transportations")
-def get_transportations():
-    transportations = ["Bus", "Train", "Flight"]
-    return transportations
