@@ -1,3 +1,11 @@
+def calculate_total_cost(
+    hotel_cost,
+    transportation_cost,
+    food_cost,
+    miscellaneous_cost
+):
+    return (hotel_cost + transportation_cost + food_cost + miscellaneous_cost)
+
 def calculate_daily_budget(budget, days):
     return budget/days
 

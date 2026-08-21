@@ -1,4 +1,4 @@
-from services.trip_service import calculate_daily_budget, get_trip_category, get_transportation_recommendation, get_season
+from services.trip_service import calculate_total_cost, calculate_daily_budget, get_trip_category, get_transportation_recommendation, get_season
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -22,12 +22,23 @@ class TripRequest(BaseModel):
     country: str
     days: int
     budget: float
+    hotel_cost: float = 0
+    transportation_cost: float = 0
+    food_cost: float = 0
+    miscellaneous_cost: float = 0
     currency: str
     travel_month: str
     travel_style: str
 
 @app.post("/api/v1/trips")
 def create_trip(request: TripRequest):
+    total_estimated_cost = calculate_total_cost(
+        request.hotel_cost,
+        request.transportation_cost,
+        request.food_cost,
+        request.miscellaneous_cost,
+    )
+    budget_exceeded = total_estimated_cost > request.budget
     daily_budget = calculate_daily_budget(request.budget, request.days)
     category = get_trip_category(request.budget)
     transportation = get_transportation_recommendation(category)
@@ -38,6 +49,12 @@ def create_trip(request: TripRequest):
         country=request.country,
         days=request.days,
         budget=request.budget,
+        hotel_cost=request.hotel_cost,
+        transportation_cost=request.transportation_cost,
+        food_cost=request.food_cost,
+        miscellaneous_cost=request.miscellaneous_cost,
+        total_estimated_cost=total_estimated_cost,
+        budget_exceeded=budget_exceeded,
         currency=request.currency,
         travel_month=request.travel_month,
         daily_budget=daily_budget,
@@ -75,42 +92,6 @@ def get_trip(trip_id: int):
 
     return trip
 
-@app.put("/api/v1/trips/{trip_id}")
-def update_trip(trip_id: int, request: TripRequest):
-    db = SessionLocal()
-
-    trip = db.query(Trip).filter(Trip.id == trip_id).first()
-
-    if trip is None:
-        db.close()
-        raise HTTPException(
-            status_code=404,
-            detail=f"Trip with id {trip_id} not found"
-        )
-
-    daily_budget = calculate_daily_budget(request.budget, request.days)
-    category = get_trip_category(request.budget)
-    transportation = get_transportation_recommendation(category)
-    season = get_season(request.travel_month)
-
-    trip.destinations = request.destinations
-    trip.country = request.country
-    trip.days = request.days
-    trip.budget = request.budget
-    trip.currency = request.currency
-    trip.travel_month = request.travel_month
-    trip.travel_style = request.travel_style
-    trip.daily_budget = daily_budget
-    trip.category = category
-    trip.recommendation_transport = transportation
-    trip.season = season
-
-    db.commit()
-    db.refresh(trip)
-    db.close()
-
-    return trip
-
 @app.delete("/api/v1/trips/{trip_id}")
 def delete_trip(trip_id: int):
     db = SessionLocal()
@@ -129,6 +110,56 @@ def delete_trip(trip_id: int):
     db.close()
 
     return {"message": f"Trip with id {trip_id} deleted successfully"}
+
+
+@app.put("/api/v1/trips/{trip_id}")
+def update_trip(trip_id: int, request: TripRequest):
+    db = SessionLocal()
+
+    trip = db.query(Trip).filter(Trip.id == trip_id).first()
+
+    if trip is None:
+        db.close()
+        raise HTTPException(
+            status_code=404,
+            detail=f"Trip with id {trip_id} not found"
+        )
+
+
+    daily_budget = calculate_daily_budget(request.budget, request.days)
+    total_estimated_cost = calculate_total_cost(
+        request.hotel_cost,
+        request.transportation_cost,
+        request.food_cost,
+        request.miscellaneous_cost,
+    )
+
+    trip.hotel_cost = request.hotel_cost
+    trip.transportation_cost = request.transportation_cost
+    trip.food_cost = request.food_cost
+    trip.miscellaneous_cost = request.miscellaneous_cost
+    trip.total_estimated_cost = total_estimated_cost
+    trip.budget_exceeded = total_estimated_cost > request.budget
+    category = get_trip_category(request.budget)
+    transportation = get_transportation_recommendation(category)
+    season = get_season(request.travel_month)
+    trip.destinations = request.destinations
+    trip.country = request.country
+    trip.days = request.days
+    trip.budget = request.budget
+    trip.currency = request.currency
+    trip.travel_month = request.travel_month
+    trip.travel_style = request.travel_style
+    trip.daily_budget = daily_budget
+    trip.category = category
+    trip.recommendation_transport = transportation
+    trip.season = season
+
+    db.commit()
+    db.refresh(trip)
+    db.close()
+
+    return trip
 
 @app.get("/api/v1/trip-categories")
 def get_trip_categories():

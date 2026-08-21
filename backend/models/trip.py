@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, JSON, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, Float, JSON, DateTime
 from sqlalchemy.sql import func
 
 from database import Base
@@ -12,6 +12,12 @@ class Trip(Base):
     country = Column(String, nullable=False)
     days = Column(Integer, nullable=False)
     budget = Column(Float, nullable=False)
+    hotel_cost = Column(Float, nullable=False, default=0)
+    transportation_cost = Column(Float, nullable=False, default=0)
+    food_cost = Column(Float, nullable=False, default=0)
+    miscellaneous_cost = Column(Float, nullable=False, default=0)
+    total_estimated_cost = Column(Float, nullable=False, default=0)
+    budget_exceeded = Column(Boolean, nullable=False, default=False)
     currency = Column(String, nullable=False)
     travel_month = Column(String, nullable=False)
     category = Column(String, nullable=False)
