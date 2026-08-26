@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Optional, Sequence
 
@@ -30,7 +31,7 @@ def get_ai_recommendations(
     travel_style: str,
     travel_month: str,
     client: Optional[BaseClient] = None,
-) -> str:
+) -> dict:
     """Generate a travel itinerary from the supplied trip details."""
     if days < 1:
         raise ValueError("days must be at least 1")
@@ -44,16 +45,19 @@ def get_ai_recommendations(
     Style: {travel_style}
     Month: {travel_month}
 
-    Include:
-    - Daily itenerary
-    - 2-3 morning activites for each day
-    - Afternoon activites with cultural sites and experience for each day
-    - Evening activities with dinner spots and nightlife for each day
-    - Local dishes and places to try them
-    - Transportation suggestions between activities
-    - Estimated daily costs for accommodation, food, transport, activities, and other expenses
-
-    Keep the plan within budget where possible and state assumptions. Return Markdown (##) with headings and bullet lists (-). Do not return JSON, code fences, or meta-commentary.
+        Return ONLY valid JSON. Do not use Markdown, code fences, or meta-commentary.
+        Use exactly this shape:
+        {{
+            "title": "Short itinerary title",
+            "daily_itinerary": [
+                {{"day": 1, "title": "Day title", "morning": ["activity"], "afternoon": ["activity"], "evening": ["activity"], "estimated_cost": 0}}
+            ],
+            "travel_tips": ["practical tip"],
+            "local_food_recommendations": ["dish and where to try it"],
+            "estimated_budget_breakdown": {{"accommodation": 0, "food": 0, "transport": 0, "activities": 0, "other": 0, "total": 0}},
+            "assumptions": ["planning assumption"]
+        }}
+        Include 2-3 activities in each daily period. Keep the plan within budget where possible.
     """
 
     bedrock_client = client or configure_bedrock()
@@ -70,4 +74,8 @@ def get_ai_recommendations(
             }
         ],
     )
-    return response["output"]["message"]["content"][0]["text"]
+    raw_recommendation = response["output"]["message"]["content"][0]["text"].strip()
+    try:
+        return json.loads(raw_recommendation)
+    except json.JSONDecodeError as error:
+        raise ValueError("Bedrock returned invalid itinerary JSON") from error

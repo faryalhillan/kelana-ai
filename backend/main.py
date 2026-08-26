@@ -1,12 +1,23 @@
+import json
+
 from services.trip_service import calculate_total_cost, calculate_daily_budget, get_trip_category, get_transportation_recommendation, get_season
 from services.bedrock_service import get_ai_recommendations
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from models.trip import Trip
 from database import SessionLocal, init_db
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 init_db()
 
@@ -183,7 +194,7 @@ def generate_ai_recommendations(trip_id: int):
             travel_style=trip.travel_style,
             travel_month=trip.travel_month,
         )
-        trip.ai_recommendations = recommendation
+        trip.ai_recommendations = json.dumps(recommendation)
         db.commit()
         return {
             "trip_id": trip.id,
