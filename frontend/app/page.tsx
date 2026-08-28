@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 
 type TripResult = {
   id: number;
@@ -46,6 +48,7 @@ const initialForm = {
 };
 
 export default function Home() {
+  const router = useRouter();
   const [form, setForm] = useState(initialForm);
   const [result, setResult] = useState<TripResult | null>(null);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
@@ -76,7 +79,7 @@ export default function Home() {
     };
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/trips", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/trips`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -84,7 +87,8 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "The trip could not be created.");
       setResult(data);
-      await generateRecommendation(data.id);
+        const generated = await generateRecommendation(data.id);
+        if (generated) router.push("/trips");
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : "Unable to reach the trip planner.");
     } finally {
@@ -96,12 +100,14 @@ export default function Home() {
     setIsGenerating(true);
     setError("");
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/trips/${tripId}/generate`, { method: "POST" });
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/trips/${tripId}/generate`, { method: "POST" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Unable to generate the itinerary.");
       setRecommendation(data.recommendation as Recommendation);
+			return true;
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : "Unable to generate the itinerary.");
+			return false;
     } finally {
       setIsGenerating(false);
       setIsSubmitting(false);
@@ -119,7 +125,7 @@ export default function Home() {
     <main className="planner-shell">
       <header className="topbar">
         <div className="brand"><span className="brand-mark">K</span><span>Kelana<span className="brand-accent">AI</span></span></div>
-        <span className="topbar-note">Your next story starts here</span>
+        <div className="topbar-actions"><span className="topbar-note">Your next story starts here</span><Link className="topbar-trips" href="/trips">My trips <span aria-hidden="true">↗</span></Link></div>
       </header>
       <section className="hero-banner relative isolate flex min-h-[360px] items-end overflow-hidden rounded-[2rem] p-6 text-white md:min-h-[430px] md:p-10">
         <Image className="absolute inset-0 -z-20 h-full w-full object-cover" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1800&q=85" alt="Traditional Kyoto street surrounded by autumn trees" fill priority sizes="(max-width: 760px) 100vw, 1100px" />
@@ -164,6 +170,7 @@ export default function Home() {
       <footer className="mt-24 flex flex-col gap-5 border-t border-[#d9ded8] pt-7 text-sm text-[#71807a] md:flex-row md:items-center md:justify-between">
         <p className="m-0">© 2026 KelanaAI. Made for curious travelers.</p>
         <nav className="flex flex-wrap gap-5" aria-label="Footer navigation">
+          <Link className="transition-colors hover:text-[#e76f51]" href="/trips">My trips</Link>
           <a className="transition-colors hover:text-[#e76f51]" href="#planner">Plan a trip</a>
           <a className="transition-colors hover:text-[#e76f51]" href="#itinerary">Your itinerary</a>
           <a className="transition-colors hover:text-[#e76f51]" href="mailto:hello@kelana.ai">Contact</a>
