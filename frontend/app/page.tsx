@@ -1,9 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import Navbar from "@/components/Navbar";
+import { getAuthToken, getProfile } from "@/services/authService";
+import { apiRequest } from "@/services/tripService";
 
 type TripResult = {
   id: number;
@@ -55,6 +58,17 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
+
+  useEffect(() => {
+    const token = getAuthToken();
+    if (!token) {
+      setWelcomeName("");
+      return;
+    }
+
+    getProfile().then((profile) => setWelcomeName(profile.name)).catch(() => setWelcomeName("Traveler"));
+  }, []);
 
   const updateField = (field: keyof typeof initialForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -79,16 +93,14 @@ export default function Home() {
     };
 
     try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/trips`, {
+      const data = await apiRequest<TripResult>("/api/v1/trips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "The trip could not be created.");
       setResult(data);
-        const generated = await generateRecommendation(data.id);
-        if (generated) router.push("/trips");
+      const generated = await generateRecommendation(data.id);
+      if (generated) router.push("/trips");
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : "Unable to reach the trip planner.");
     } finally {
@@ -100,14 +112,14 @@ export default function Home() {
     setIsGenerating(true);
     setError("");
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/trips/${tripId}/generate`, { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Unable to generate the itinerary.");
+      const data = await apiRequest<{ recommendation: Recommendation }>(`/api/v1/trips/${tripId}/generate`, {
+        method: "POST",
+      });
       setRecommendation(data.recommendation as Recommendation);
-			return true;
+      return true;
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : "Unable to generate the itinerary.");
-			return false;
+      return false;
     } finally {
       setIsGenerating(false);
       setIsSubmitting(false);
@@ -123,10 +135,12 @@ export default function Home() {
 
   return (
     <main className="planner-shell">
-      <header className="topbar">
-        <div className="brand"><span className="brand-mark">K</span><span>Kelana<span className="brand-accent">AI</span></span></div>
-        <div className="topbar-actions"><span className="topbar-note">Your next story starts here</span><Link className="topbar-trips" href="/trips">My trips <span aria-hidden="true">↗</span></Link></div>
-      </header>
+      <Navbar active="" />
+      {welcomeName ? (
+        <div className="welcome-banner" aria-live="polite">
+          Welcome back, {welcomeName} 👋
+        </div>
+      ) : null}
       <section className="hero-banner relative isolate flex min-h-[360px] items-end overflow-hidden rounded-[2rem] p-6 text-white md:min-h-[430px] md:p-10">
         <Image className="absolute inset-0 -z-20 h-full w-full object-cover" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1800&q=85" alt="Traditional Kyoto street surrounded by autumn trees" fill priority sizes="(max-width: 760px) 100vw, 1100px" />
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(15,35,30,.82),rgba(15,35,30,.18))]" />

@@ -1,3 +1,5 @@
+import { getAuthToken } from "@/services/authService";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export type Trip = {
@@ -41,15 +43,43 @@ export type Recommendation = {
 	assumptions: string[];
 };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-	const response = await fetch(`${API_URL}${path}`, init);
-	const data = await response.json();
-	if (!response.ok) throw new Error(data.detail || "Something went wrong.");
+function getClientToken() {
+	if (typeof window === "undefined") return "";
+	return getAuthToken();
+}
+
+export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+	const headers = new Headers(init?.headers ?? {});
+	const token = getClientToken();
+
+	if (!token && typeof window !== "undefined") {
+		window.location.href = "/login";
+		throw new Error("Please log in to continue.");
+	}
+
+	if (token) {
+		headers.set("Authorization", `Bearer ${token}`);
+	}
+
+	const response = await fetch(`${API_URL}${path}`, {
+		...init,
+		headers,
+	});
+	const data = await response.json().catch(() => ({}));
+	if (response.status === 401 || response.status === 403) {
+		if (typeof window !== "undefined") {
+			localStorage.removeItem("kelana_token");
+			localStorage.removeItem("kelana_token_type");
+			window.location.href = "/login";
+		}
+		throw new Error("Your session has expired. Please log in again.");
+	}
+	if (!response.ok) throw new Error((data as { detail?: string }).detail || "Something went wrong.");
 	return data as T;
 }
 
-export function getTrips() { return request<Trip[]>("/api/v1/trips"); }
-export function getTrip(id: number) { return request<Trip>(`/api/v1/trips/${id}`); }
+export function getTrips() { return apiRequest<Trip[]>("/api/v1/trips"); }
+export function getTrip(id: number) { return apiRequest<Trip>(`/api/v1/trips/${id}`); }
 export function generateTrip(id: number) {
-	return request<{ recommendation: Recommendation }>(`/api/v1/trips/${id}/generate`, { method: "POST" });
+	return apiRequest<{ recommendation: Recommendation }>(`/api/v1/trips/${id}/generate`, { method: "POST" });
 }

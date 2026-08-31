@@ -1,22 +1,26 @@
+"use client";
+
 import Link from "next/link";
+import { use, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DayCards from "@/components/DayCards";
-import { getTrip, type Recommendation } from "@/services/tripService";
+import { apiRequest, type Recommendation, type Trip } from "@/services/tripService";
 
 type Props = { params: Promise<{ id: string }> };
 
-export default async function TripDetailPage({ params }: Props) {
-  const { id } = await params;
-  let trip;
-  let error = "";
-  try {
-    trip = await getTrip(Number(id));
-  } catch (requestError) {
-    error = requestError instanceof Error ? requestError.message : "Unable to load this trip.";
-  }
+export default function TripDetailPage({ params }: Props) {
+  const { id } = use(params);
+  const [trip, setTrip] = useState<Trip | null>(null);
+  const [error, setError] = useState("");
 
-  if (!trip) return <main className="detail-shell"><Link className="back-link" href="/trips">← Back to trips</Link><div className="empty-state"><span className="empty-icon">?</span><h1>Trip not found</h1><p>{error}</p><Link className="primary-link" href="/trips">View trip history <span aria-hidden="true">→</span></Link></div></main>;
+  useEffect(() => {
+    apiRequest<Trip>(`/api/v1/trips/${Number(id)}`)
+      .then((data) => setTrip(data))
+      .catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Unable to load this trip."));
+  }, [id]);
+
+  if (!trip) return <main className="detail-shell"><Navbar active="trips" /><div className={`empty-state ${error ? "error-state" : "compact"}`}><span className="empty-icon">{error ? "!" : "✦"}</span><h1>{error ? "Trip unavailable" : "Loading your trip…"}</h1>{error ? <p>{error}</p> : null}<Link className="primary-link" href={error ? "/login" : "/trips"}>{error ? "Go to login" : "Back to trips"} <span aria-hidden="true">→</span></Link></div></main>;
 
   let recommendation: Recommendation | null = null;
   if (trip.ai_recommendations) {
