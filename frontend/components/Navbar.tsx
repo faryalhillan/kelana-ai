@@ -32,6 +32,7 @@ export default function Navbar({ active = "" }: { active?: string }) {
 			<Link className="brand" href="/"><span className="brand-mark">K</span><span>Kelana<span className="brand-accent">AI</span></span></Link>
 		</div>
 		<nav aria-label="Main navigation" className="site-nav-links">
+			<Link className={active === "assistant" ? "active" : ""} href="/assistant">Ask AI</Link>
 			<Link className={active === "trips" ? "active" : ""} href="/trips">My trips</Link>
 			<Link className={active === "profile" ? "active" : ""} href="/profile">Profile</Link>
 			{isLoggedIn ? (

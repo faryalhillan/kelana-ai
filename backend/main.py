@@ -9,6 +9,7 @@ from pydantic import BaseModel, field_validator
 from services.trip_service import calculate_total_cost, calculate_daily_budget, get_trip_category, get_transportation_recommendation, get_season
 from services.bedrock_service import get_ai_recommendations
 from services.auth_service import register_user, login_user, get_current_user
+from services.kb_service import retrieve_and_generate
 
 from models.trip import Trip
 from models.user import User
@@ -29,6 +30,9 @@ class RegisterRequest(BaseModel):
         if "@" not in v or "." not in v.split("@")[-1]:
             raise ValueError("Invalid email address")
         return v.lower().strip()
+
+class AskRequest(BaseModel):
+    question: str
 
 class LoginRequest(BaseModel):
     email:    str
@@ -124,6 +128,19 @@ def me(current_user: User = Depends(get_current_user)):
         "created_at":  current_user.created_at,
         "total_trips": trip_count,
     }
+
+@app.post("/api/v1/ask")
+def ask(request: AskRequest):
+    try:
+        result = retrieve_and_generate(request.question)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "question": request.question,
+        "answer": result["answer"],
+        "source": result["source"],
+    }
+
 # Protected trip endpoints
 
 @app.post("/api/v1/trips")
