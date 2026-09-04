@@ -25,6 +25,20 @@ export type Trip = {
 	ai_recommendations?: string | null;
 };
 
+export type TripUpdate = {
+	destinations: string[];
+	country: string;
+	budget: number;
+	days: number;
+	hotel_cost?: number | null;
+	transportation_cost?: number | null;
+	food_cost?: number | null;
+	miscellaneous_cost?: number | null;
+	currency: string;
+	travel_month: string;
+	travel_style: string;
+};
+
 export type DailyPlan = {
 	day: number;
 	title: string;
@@ -53,7 +67,9 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 	const token = getClientToken();
 
 	if (!token && typeof window !== "undefined") {
-		window.location.href = "/login";
+		setTimeout(() => {
+			window.location.replace("/login");
+		}, 0);
 		throw new Error("Please log in to continue.");
 	}
 
@@ -70,7 +86,9 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 		if (typeof window !== "undefined") {
 			localStorage.removeItem("kelana_token");
 			localStorage.removeItem("kelana_token_type");
-			window.location.href = "/login";
+			setTimeout(() => {
+				window.location.replace("/login");
+			}, 0);
 		}
 		throw new Error("Your session has expired. Please log in again.");
 	}
@@ -80,6 +98,16 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
 export function getTrips() { return apiRequest<Trip[]>("/api/v1/trips"); }
 export function getTrip(id: number) { return apiRequest<Trip>(`/api/v1/trips/${id}`); }
+export function updateTrip(id: number, trip: TripUpdate) {
+	return apiRequest<Trip>(`/api/v1/trips/${id}`, {
+		method: "PUT",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(trip),
+	});
+}
+export function deleteTrip(id: number) {
+	return apiRequest<{ message: string }>(`/api/v1/trips/${id}`, { method: "DELETE" });
+}
 export function generateTrip(id: number) {
 	return apiRequest<{ recommendation: Recommendation }>(`/api/v1/trips/${id}/generate`, { method: "POST" });
 }

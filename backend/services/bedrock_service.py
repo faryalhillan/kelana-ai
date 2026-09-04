@@ -8,18 +8,29 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+AWS_BEARER_TOKEN_BEDROCK = os.getenv("AWS_BEARER_TOKEN_BEDROCK")
+AWS_REGION = os.getenv("AWS_REGION", "ap-southeast-2")
+MODEL_ID = os.getenv("MODEL_ID", "amazon.nova-lite-v1:0")
+
 def configure_bedrock(api_key: Optional[str] = None) -> BaseClient:
-    """Create a Bedrock Runtime client using values from the environment."""
-    bearer_token = api_key or os.getenv("AWS_BEARER_TOKEN_BEDROCK")
-    region = os.getenv("AWS_REGION")
+    """
+    Build and return a boto3 Bedrock Runtime client.
 
-    if not bearer_token:
-        raise RuntimeError("AWS_BEARER_TOKEN_BEDROCK is not configured")
-    if not region:
-        raise RuntimeError("AWS_REGION is not configured")
+    Authentication uses the inline Bedrock API key stored in
+    AWS_BEARER_TOKEN_BEDROCK.  boto3 accepts this through the
+    ``aws_bearer_token`` token provider introduced in botocore 1.35+.
+    """
+    if not AWS_BEARER_TOKEN_BEDROCK:
+        raise ValueError(
+            "AWS_BEARER_TOKEN_BEDROCK is not set. "
+            "Check your .env file."
+        )
 
-    os.environ["AWS_BEARER_TOKEN_BEDROCK"] = bearer_token
-    return boto3.client("bedrock-runtime", region_name=region)
+    client = boto3.client(
+        service_name="bedrock-runtime",
+        region_name=AWS_REGION,
+    )
+    return client
 
 
 def get_ai_recommendations(
@@ -61,12 +72,12 @@ def get_ai_recommendations(
     """
 
     bedrock_client = client or configure_bedrock()
-    model_id = os.getenv("MODEL_ID")
-    if not model_id:
+    MODEL_ID = os.getenv("MODEL_ID")
+    if not MODEL_ID:
         raise RuntimeError("MODEL_ID is not configured")
 
     response = bedrock_client.converse(
-        modelId=model_id,
+        modelId=MODEL_ID,
         messages=[
             {
                 "role": "user",
@@ -79,3 +90,37 @@ def get_ai_recommendations(
         return json.loads(raw_recommendation)
     except json.JSONDecodeError as error:
         raise ValueError("Bedrock returned invalid itinerary JSON") from error
+
+def get_chat_response(prompt: list[dict[str, str]]) -> str:
+    """
+    Call Amazon Bedrock with conversational history and return the assistant
+    response as a plain string.
+
+    Args:
+        prompt: Conversation history as role/content dictionaries.
+
+    Returns:
+        The model's text response.
+    """
+    bedrock_client = configure_bedrock()
+
+    messages = [
+        {
+            "role": item["role"],
+            "content": [{"text": item["content"]}],
+        }
+        for item in prompt
+    ]
+
+    response = bedrock_client.converse(
+        modelId=MODEL_ID,
+        messages=messages,
+    )
+
+    output_message = response["output"]["message"]
+    text_parts = [
+        block["text"]
+        for block in output_message["content"]
+        if "text" in block
+    ]
+    return "\n".join(text_parts)

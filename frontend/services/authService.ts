@@ -34,7 +34,14 @@ export function logout() {
 	if (typeof window === "undefined") return;
 	localStorage.removeItem(AUTH_TOKEN_KEY);
 	localStorage.removeItem(AUTH_TOKEN_TYPE_KEY);
-	window.location.href = "/login";
+	
+	// Use a safer navigation method that doesn't break Web Vitals
+	if (typeof window !== "undefined") {
+		// Use setTimeout to ensure the navigation happens after current execution
+		setTimeout(() => {
+			window.location.replace("/login");
+		}, 0);
+	}
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {

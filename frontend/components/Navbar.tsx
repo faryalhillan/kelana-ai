@@ -5,21 +5,25 @@ import { useEffect, useState } from "react";
 import { getAuthToken, getProfile, logout } from "@/services/authService";
 
 export default function Navbar({ active = "" }: { active?: string }) {
+	const [isHydrated, setIsHydrated] = useState(false);
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
 	const [userName, setUserName] = useState("");
 
 	useEffect(() => {
-		const hasToken = Boolean(getAuthToken());
-		setIsLoggedIn(hasToken);
-
-		if (!hasToken) {
-			setUserName("");
-			return;
-		}
-
-		getProfile()
-			.then((profile) => setUserName(profile.name))
-			.catch(() => setUserName("Traveler"));
+		Promise.resolve().then(() => {
+			const hasToken = Boolean(getAuthToken());
+			setIsHydrated(true);
+			if (!hasToken) return;
+			getProfile()
+				.then((profile) => {
+					setIsLoggedIn(true);
+					setUserName(profile.name);
+				})
+				.catch(() => {
+					setIsLoggedIn(true);
+					setUserName("Traveler");
+				});
+		});
 	}, [active]);
 
 	const handleLogout = () => {
@@ -33,9 +37,10 @@ export default function Navbar({ active = "" }: { active?: string }) {
 		</div>
 		<nav aria-label="Main navigation" className="site-nav-links">
 			<Link className={active === "assistant" ? "active" : ""} href="/assistant">Ask AI</Link>
+			<Link className={active === "chat" ? "active" : ""} href="/chat">Chat</Link>
 			<Link className={active === "trips" ? "active" : ""} href="/trips">My trips</Link>
 			<Link className={active === "profile" ? "active" : ""} href="/profile">Profile</Link>
-			{isLoggedIn ? (
+			{!isHydrated ? <div className="auth-cta-row" aria-hidden="true" /> : isLoggedIn ? (
 				<div className="auth-cta-row">
 					<Link className="nav-user" href="/profile">Hi, {userName || "Traveler"}</Link>
 					<button type="button" className="nav-cta nav-logout" onClick={handleLogout}>Logout</button>

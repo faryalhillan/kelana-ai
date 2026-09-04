@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import TripList from "@/components/TripList";
-import { apiRequest, type Trip } from "@/services/tripService";
+import { apiRequest, deleteTrip, type Trip } from "@/services/tripService";
 
 export default function TripsPage() {
+	const router = useRouter();
 	const [trips, setTrips] = useState<Trip[]>([]);
 	const [error, setError] = useState("");
 	const [isLoading, setIsLoading] = useState(true);
@@ -15,7 +17,7 @@ export default function TripsPage() {
 	useEffect(() => {
 		const token = localStorage.getItem("kelana_token");
 		if (!token) {
-			window.location.href = "/login";
+			router.push("/login");
 			return;
 		}
 
@@ -23,7 +25,17 @@ export default function TripsPage() {
 			.then((data) => setTrips(data))
 			.catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Unable to load your trips."))
 			.finally(() => setIsLoading(false));
-	}, []);
+	}, [router]);
+
+	const removeTrip = async (tripId: number) => {
+		try {
+			await deleteTrip(tripId);
+			setTrips((currentTrips) => currentTrips.filter((trip) => trip.id !== tripId));
+		} catch (requestError) {
+			setError(requestError instanceof Error ? requestError.message : "Unable to delete this trip.");
+			throw requestError;
+		}
+	};
 
 	return (
 		<main className="history-shell">
@@ -53,7 +65,7 @@ export default function TripsPage() {
 					<Link className="primary-link" href="/#planner">Generate a trip <span aria-hidden="true">→</span></Link>
 				</div>
 			) : (
-				<TripList trips={trips} />
+				<TripList trips={trips} onDelete={removeTrip} />
 			)}
 			<Footer />
 		</main>
