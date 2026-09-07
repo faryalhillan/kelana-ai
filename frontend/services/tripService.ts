@@ -67,33 +67,49 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 	const token = getClientToken();
 
 	if (!token && typeof window !== "undefined") {
+		// Redirect without throwing to avoid error flash
 		setTimeout(() => {
 			window.location.replace("/login");
 		}, 0);
-		throw new Error("Please log in to continue.");
+		// Return a rejected promise that won't be caught before redirect
+		return new Promise(() => {});
 	}
 
 	if (token) {
 		headers.set("Authorization", `Bearer ${token}`);
 	}
 
-	const response = await fetch(`${API_URL}${path}`, {
-		...init,
-		headers,
-	});
-	const data = await response.json().catch(() => ({}));
-	if (response.status === 401 || response.status === 403) {
-		if (typeof window !== "undefined") {
-			localStorage.removeItem("kelana_token");
-			localStorage.removeItem("kelana_token_type");
-			setTimeout(() => {
-				window.location.replace("/login");
-			}, 0);
+	try {
+		const response = await fetch(`${API_URL}${path}`, {
+			...init,
+			headers,
+		});
+		
+		const data = await response.json().catch(() => ({}));
+		
+		if (response.status === 401 || response.status === 403) {
+			if (typeof window !== "undefined") {
+				localStorage.removeItem("kelana_token");
+				localStorage.removeItem("kelana_token_type");
+				setTimeout(() => {
+					window.location.replace("/login");
+				}, 0);
+			}
+			throw new Error("Your session has expired. Please log in again.");
 		}
-		throw new Error("Your session has expired. Please log in again.");
+		
+		if (!response.ok) {
+			throw new Error((data as { detail?: string }).detail || "Something went wrong.");
+		}
+		
+		return data as T;
+	} catch (error) {
+		// Network errors (backend not running, CORS issues, etc.)
+		if (error instanceof TypeError && error.message.includes("fetch")) {
+			throw new Error("Unable to connect to the server. Please check if the backend is running.");
+		}
+		throw error;
 	}
-	if (!response.ok) throw new Error((data as { detail?: string }).detail || "Something went wrong.");
-	return data as T;
 }
 
 export function getTrips() { return apiRequest<Trip[]>("/api/v1/trips"); }

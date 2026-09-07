@@ -3,6 +3,8 @@
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import AuthGuard from "@/components/AuthGuard";
+import { renderMarkdown } from "@/utils/markdown";
 import {
 	Conversation,
 	ConversationMessage,
@@ -22,141 +24,16 @@ function formatMessageTime(value: string) {
 	return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-function renderMarkdown(text: string) {
-	const lines = text.split("\n");
-	const elements: React.ReactNode[] = [];
-	let i = 0;
-
-	while (i < lines.length) {
-		const line = lines[i];
-
-		// Skip empty lines
-		if (!line.trim()) {
-			i++;
-			continue;
-		}
-
-		// Check for headers
-		const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
-		if (headerMatch) {
-			const level = headerMatch[1].length;
-			const content = headerMatch[2];
-			const Tag = `h${Math.min(level + 2, 6)}`;
-			
-			elements.push(
-				React.createElement(
-					Tag,
-					{ key: `h-${i}`, style: { marginTop: level === 1 ? "1.2em" : "1em", marginBottom: "0.5em", fontWeight: "700" } },
-					processInlineFormatting(content, `h-${i}`)
-				)
-			);
-			i++;
-			continue;
-		}
-
-		// Check for unordered list
-		if (line.match(/^\s*[-*]\s+/)) {
-			const listItems: string[] = [];
-			while (i < lines.length && lines[i].match(/^\s*[-*]\s+/)) {
-				listItems.push(lines[i].replace(/^\s*[-*]\s+/, ""));
-				i++;
-			}
-			elements.push(
-				<ul key={`ul-${i}`} style={{ marginLeft: "1.5em", marginBottom: "0.8em" }}>
-					{listItems.map((item, idx) => (
-						<li key={idx} style={{ marginBottom: "0.3em" }}>
-							{processInlineFormatting(item, `ul-${i}-${idx}`)}
-						</li>
-					))}
-				</ul>
-			);
-			continue;
-		}
-
-		// Check for ordered list
-		if (line.match(/^\s*\d+\.\s+/)) {
-			const listItems: string[] = [];
-			while (i < lines.length && lines[i].match(/^\s*\d+\.\s+/)) {
-				listItems.push(lines[i].replace(/^\s*\d+\.\s+/, ""));
-				i++;
-			}
-			elements.push(
-				<ol key={`ol-${i}`} style={{ marginLeft: "1.5em", marginBottom: "0.8em" }}>
-					{listItems.map((item, idx) => (
-						<li key={idx} style={{ marginBottom: "0.3em" }}>
-							{processInlineFormatting(item, `ol-${i}-${idx}`)}
-						</li>
-					))}
-				</ol>
-			);
-			continue;
-		}
-
-		// Regular paragraph - collect consecutive non-special lines
-		let paragraph = line;
-		i++;
-		while (i < lines.length && lines[i].trim() && !lines[i].match(/^(#{1,6}\s+|\s*[-*]\s+|\s*\d+\.\s+)/)) {
-			paragraph += " " + lines[i];
-			i++;
-		}
-
-		elements.push(
-			<p key={`p-${i}`} style={{ marginBottom: "0.8em" }}>
-				{processInlineFormatting(paragraph, `p-${i}`)}
-			</p>
-		);
-	}
-
-	return <>{elements}</>;
-}
-
-function processInlineFormatting(text: string, keyPrefix: string) {
-	const parts: (string | React.ReactNode)[] = [];
-	let lastIndex = 0;
-
-	// Regex to match **bold**, *italic*, and `code`
-	const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
-	let match;
-
-	while ((match = regex.exec(text)) !== null) {
-		// Add text before match
-		if (match.index > lastIndex) {
-			parts.push(text.substring(lastIndex, match.index));
-		}
-
-		const matched = match[0];
-		if (matched.startsWith("**") && matched.endsWith("**")) {
-			// Bold
-			parts.push(
-				<strong key={`${keyPrefix}-${match.index}`}>
-					{matched.slice(2, -2)}
-				</strong>
-			);
-		} else if (matched.startsWith("*") && matched.endsWith("*")) {
-			// Italic
-			parts.push(
-				<em key={`${keyPrefix}-${match.index}`}>
-					{matched.slice(1, -1)}
-				</em>
-			);
-		} else if (matched.startsWith("`") && matched.endsWith("`")) {
-			// Code
-			parts.push(
-				<code key={`${keyPrefix}-${match.index}`} style={{ background: "rgba(24,35,33,0.05)", padding: "2px 6px", borderRadius: "4px", fontFamily: "monospace", fontSize: "0.9em" }}>
-					{matched.slice(1, -1)}
-				</code>
-			);
-		}
-
-		lastIndex = regex.lastIndex;
-	}
-
-	// Add remaining text
-	if (lastIndex < text.length) {
-		parts.push(text.substring(lastIndex));
-	}
-
-	return parts.length === 0 ? text : parts;
+function getRelativeTime(dateString: string): string {
+	const date = new Date(dateString);
+	const now = new Date();
+	const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+	
+	if (diffInSeconds < 60) return "Just now";
+	if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+	if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+	if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+	return formatConversationDate(dateString);
 }
 
 export default function ChatPage() {
@@ -199,7 +76,14 @@ export default function ChatPage() {
 		setError("");
 		try {
 			const result = await createConversation();
-			const conversation: Conversation = { id: result.conversation_id, title: null, created_at: new Date().toISOString() };
+			const conversation: Conversation = { 
+				id: result.conversation_id, 
+				title: null, 
+				created_at: new Date().toISOString(),
+				updated_at: new Date().toISOString(),
+				last_message: null,
+				last_message_role: null,
+			};
 			setConversations((current) => [conversation, ...current]);
 			setSelectedId(conversation.id);
 			setMessages([]);
@@ -237,9 +121,19 @@ export default function ChatPage() {
 				content: result.answer,
 				created_at: new Date().toISOString(),
 			}]);
-			if (!selectedConversation?.title) {
-				setConversations((current) => current.map((conversation) => conversation.id === selectedId ? { ...conversation, title: content.slice(0, 100) } : conversation));
-			}
+			
+			// Update conversation list with last message and updated_at
+			setConversations((current) => current.map((conversation) => 
+				conversation.id === selectedId 
+					? { 
+							...conversation, 
+							title: conversation.title || content.slice(0, 100),
+							last_message: result.answer.slice(0, 80) + (result.answer.length > 80 ? "..." : ""),
+							last_message_role: "assistant" as const,
+							updated_at: new Date().toISOString(),
+						} 
+					: conversation
+			).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
 		} catch (requestError) {
 			setMessages((current) => current.filter((message) => message.id !== temporaryMessage.id));
 			setError(requestError instanceof Error ? requestError.message : "Unable to send your message.");
@@ -282,11 +176,12 @@ export default function ChatPage() {
 
 	return <main className="chat-shell">
 		<Navbar active="chat" />
-		<section className="chat-heading"><p className="eyebrow">CONVERSATION SPACE</p><h1>Continue the journey</h1><p>Keep your travel questions together and let KelanaAI remember the thread.</p></section>
-		<section className="chat-workspace">
+		<AuthGuard showInlinePrompt={true}>
+			<section className="chat-heading"><p className="eyebrow">CONVERSATION SPACE</p><h1>Continue the journey</h1><p>Keep your travel questions together and let KelanaAI remember the thread.</p></section>
+			<section className="chat-workspace">
 			<aside className="conversation-sidebar" aria-label="Conversations">
 				<div className="sidebar-heading"><div><p className="eyebrow">YOUR THREADS</p><h2>Conversations</h2></div><button type="button" className="new-conversation-button" onClick={startConversation} aria-label="Start a new conversation">+</button></div>
-				{isLoadingConversations ? <p className="conversation-placeholder">Loading threads…</p> : conversations.length === 0 ? <div className="conversation-placeholder"><span>✦</span><p>No conversations yet.</p><button type="button" className="text-button" onClick={startConversation}>Start one</button></div> : <div className="conversation-list">{conversations.map((conversation) => <div key={conversation.id} className={`conversation-item ${conversation.id === selectedId ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => { setSelectedId(conversation.id); setIsRenaming(false); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(conversation.id); setIsRenaming(false); } }}><div className="conversation-item-copy"><strong>{conversation.title || "Untitled conversation"}</strong><span>{formatConversationDate(conversation.created_at)}</span></div><button type="button" className="conversation-delete" aria-label={`Delete ${conversation.title || "untitled conversation"}`} onClick={(event) => { event.stopPropagation(); void handleDelete(conversation.id); }}>×</button></div>)}</div>}
+				{isLoadingConversations ? <p className="conversation-placeholder">Loading threads…</p> : conversations.length === 0 ? <div className="conversation-placeholder"><span>✦</span><p>No conversations yet.</p><button type="button" className="text-button" onClick={startConversation}>Start one</button></div> : <div className="conversation-list">{conversations.map((conversation) => <div key={conversation.id} className={`conversation-item ${conversation.id === selectedId ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => { setSelectedId(conversation.id); setIsRenaming(false); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(conversation.id); setIsRenaming(false); } }}><div className="conversation-item-copy"><strong>{conversation.title || "Untitled conversation"}</strong>{conversation.last_message && <p className="conversation-preview">{conversation.last_message_role === "user" ? "You: " : ""}{conversation.last_message}</p>}<span>{getRelativeTime(conversation.updated_at)}</span></div><button type="button" className="conversation-delete" aria-label={`Delete ${conversation.title || "untitled conversation"}`} onClick={(event) => { event.stopPropagation(); void handleDelete(conversation.id); }}>×</button></div>)}</div>}
 			</aside>
 			<section className="chat-panel" aria-label="Chat with KelanaAI">
 				{selectedConversation ? <>
@@ -295,8 +190,9 @@ export default function ChatPage() {
 					<form className="message-form" onSubmit={handleSend}><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask a follow-up about your trip…" rows={2} disabled={isSending} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} /><button type="submit" className="send-button" disabled={isSending || !draft.trim()} aria-label="Send message">{isSending ? "…" : "→"}</button></form>
 				</> : <div className="chat-empty no-thread"><span className="empty-icon">✦</span><h2>Start a conversation</h2><p>Your saved conversations will appear here.</p><button type="button" className="primary-link" onClick={startConversation}>New conversation <span aria-hidden="true">→</span></button></div>}
 			</section>
-		</section>
-		{error ? <p className="status error chat-error">{error}</p> : null}
+			</section>
+			{error ? <p className="status error chat-error">{error}</p> : null}
+		</AuthGuard>
 		<Footer />
 	</main>;
 }

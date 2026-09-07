@@ -7,7 +7,63 @@ import type { Trip } from "@/services/tripService";
 export default function TripCard({ trip, onDelete }: { trip: Trip; onDelete?: (id: number) => Promise<void> }) {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const categoryClass = trip.category.toLowerCase();
-	const destinationFlag = trip.country.toLowerCase() === "japan" ? "🇯🇵" : trip.country.toLowerCase() === "indonesia" ? "🇮🇩" : "✈";
+	
+	// Country flag mapping
+	const countryFlags: Record<string, string> = {
+		japan: "🇯🇵",
+		indonesia: "🇮🇩",
+		france: "🇫🇷",
+		thailand: "🇹🇭",
+		usa: "🇺🇸",
+		"united states": "🇺🇸",
+		italy: "🇮🇹",
+		spain: "🇪🇸",
+		"united kingdom": "🇬🇧",
+		uk: "🇬🇧",
+		germany: "🇩🇪",
+		australia: "🇦🇺",
+		canada: "🇨🇦",
+		mexico: "🇲🇽",
+		brazil: "🇧🇷",
+		china: "🇨🇳",
+		"south korea": "🇰🇷",
+		korea: "🇰🇷",
+		india: "🇮🇳",
+		singapore: "🇸🇬",
+		vietnam: "🇻🇳",
+		greece: "🇬🇷",
+		portugal: "🇵🇹",
+		netherlands: "🇳🇱",
+		switzerland: "🇨🇭",
+		austria: "🇦🇹",
+		turkey: "🇹🇷",
+		egypt: "🇪🇬",
+		"south africa": "🇿🇦",
+		"new zealand": "🇳🇿",
+		argentina: "🇦🇷",
+		peru: "🇵🇪",
+		chile: "🇨🇱",
+		colombia: "🇨🇴",
+		morocco: "🇲🇦",
+		dubai: "🇦🇪",
+		uae: "🇦🇪",
+		malaysia: "🇲🇾",
+		philippines: "🇵🇭",
+		cambodia: "🇰🇭",
+		iceland: "🇮🇸",
+		norway: "🇳🇴",
+		sweden: "🇸🇪",
+		denmark: "🇩🇰",
+		finland: "🇫🇮",
+		poland: "🇵🇱",
+		"czech republic": "🇨🇿",
+		croatia: "🇭🇷",
+		ireland: "🇮🇪",
+		belgium: "🇧🇪",
+	};
+	
+	const destinationFlag = countryFlags[trip.country.toLowerCase()] || "✈️";
+	
 	const handleDelete = async () => {
 		if (!onDelete || !window.confirm("Delete this saved trip? This cannot be undone.")) return;
 		setIsDeleting(true);

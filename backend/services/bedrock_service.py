@@ -41,6 +41,10 @@ def get_ai_recommendations(
     budget: float,
     travel_style: str,
     travel_month: str,
+    hotel_cost: Optional[float] = None,
+    transportation_cost: Optional[float] = None,
+    food_cost: Optional[float] = None,
+    miscellaneous_cost: Optional[float] = None,
     client: Optional[BaseClient] = None,
 ) -> dict:
     """Generate a travel itinerary from the supplied trip details."""
@@ -50,11 +54,30 @@ def get_ai_recommendations(
     destination_text = (
         destinations if isinstance(destinations, str) else ", ".join(destinations)
     )
+    
+    # Build budget allocation context
+    budget_constraints = []
+    if hotel_cost is not None:
+        budget_constraints.append(f"Hotel/Accommodation: {currency} {hotel_cost}")
+    if transportation_cost is not None:
+        budget_constraints.append(f"Transportation: {currency} {transportation_cost}")
+    if food_cost is not None:
+        budget_constraints.append(f"Food & Drinks: {currency} {food_cost}")
+    if miscellaneous_cost is not None:
+        budget_constraints.append(f"Activities/Extras: {currency} {miscellaneous_cost}")
+    
+    budget_guidance = ""
+    if budget_constraints:
+        budget_guidance = f"\nUser has pre-allocated:\n" + "\n".join(budget_constraints) + "\nRespect these allocations in your recommendations."
+    else:
+        budget_guidance = f"\nThe user has NOT specified budget allocation. You MUST intelligently distribute the total budget across accommodation, food, transport, and activities based on:\n- The destination's cost of living\n- The travel style ({travel_style})\n- What makes sense for {days} days\n- Typical expenses in {country}"
+    
     prompt = f"""
     Create a {days}-day itinerary for {destination_text}, {country}.
     Budget: {currency} {budget}
     Style: {travel_style}
     Month: {travel_month}
+    {budget_guidance}
 
         Return ONLY valid JSON. Do not use Markdown, code fences, or meta-commentary.
         Use exactly this shape:
@@ -65,10 +88,31 @@ def get_ai_recommendations(
             ],
             "travel_tips": ["practical tip"],
             "local_food_recommendations": ["dish and where to try it"],
-            "estimated_budget_breakdown": {{"accommodation": 0, "food": 0, "transport": 0, "activities": 0, "other": 0, "total": 0}},
-            "assumptions": ["planning assumption"]
+            "estimated_budget_breakdown": {{
+                "accommodation": 0,
+                "food": 0,
+                "transport": 0,
+                "activities": 0,
+                "other": 0,
+                "total": 0
+            }},
+            "assumptions": ["planning assumption"],
+            "category": "one of: Backpacker, Standard, or Luxury based on the budget and style",
+            "season": "travel season for {travel_month} in {country} (e.g., Peak Season, Holiday Season, Off Season, Shoulder Season)",
+            "recommended_transport": "primary transportation mode appropriate for this budget and destination"
         }}
+        
+        CRITICAL: Your estimated_budget_breakdown MUST:
+        - Intelligently allocate the {currency} {budget} total budget
+        - Consider {country}'s actual costs (don't use generic percentages)
+        - Match the {travel_style} (luxury = better hotels, backpacker = hostels/cheap stays)
+        - Make accommodation, food, transport, and activities add up to approximately the total budget
+        - Be realistic for {destination_text} in {travel_month}
+        
         Include 2-3 activities in each daily period. Keep the plan within budget where possible.
+        Analyze the budget ({currency} {budget}) and travel style to determine if this is a backpacker, standard, or luxury trip.
+        Consider {travel_month} weather and tourist patterns in {country} for the season field.
+        Recommend transportation that fits the budget and destination (e.g., public transit for budget trips, rental car for road trips, domestic flights for luxury).
     """
 
     bedrock_client = client or configure_bedrock()

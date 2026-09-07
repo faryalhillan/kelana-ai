@@ -41,10 +41,10 @@ const initialForm = {
   country: "Japan",
   days: "7",
   budget: "2000",
-  hotel_cost: "700",
-  transportation_cost: "320",
-  food_cost: "420",
-  miscellaneous_cost: "160",
+  hotel_cost: "",
+  transportation_cost: "",
+  food_cost: "",
+  miscellaneous_cost: "",
   currency: "USD",
   travel_month: "October",
   travel_style: "Cultural explorer",
@@ -86,10 +86,10 @@ export default function Home() {
       destinations: form.destinations.split(",").map((place) => place.trim()).filter(Boolean),
       days: Number(form.days),
       budget: Number(form.budget),
-      hotel_cost: Number(form.hotel_cost),
-      transportation_cost: Number(form.transportation_cost),
-      food_cost: Number(form.food_cost),
-      miscellaneous_cost: Number(form.miscellaneous_cost),
+      hotel_cost: form.hotel_cost ? Number(form.hotel_cost) : null,
+      transportation_cost: form.transportation_cost ? Number(form.transportation_cost) : null,
+      food_cost: form.food_cost ? Number(form.food_cost) : null,
+      miscellaneous_cost: form.miscellaneous_cost ? Number(form.miscellaneous_cost) : null,
     };
 
     try {
@@ -100,10 +100,14 @@ export default function Home() {
       });
       setResult(data);
       const generated = await generateRecommendation(data.id);
-      if (generated) router.push("/trips");
+      if (generated) {
+        setIsSubmitting(false);
+        router.push("/trips");
+      } else {
+        setIsSubmitting(false);
+      }
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : "Unable to reach the trip planner.");
-    } finally {
       setIsSubmitting(false);
     }
   }
@@ -122,7 +126,6 @@ export default function Home() {
       return false;
     } finally {
       setIsGenerating(false);
-      setIsSubmitting(false);
     }
   }
 
@@ -180,7 +183,25 @@ export default function Home() {
           {result && <div className="result"><p className="eyebrow">TRIP #{result.id} IS READY</p><h3>{result.category} in {result.season}</h3><p>{result.recommendation_transport}. Your estimated total is {result.total_estimated_cost.toLocaleString()} {form.currency}, or {result.daily_budget.toLocaleString()} per day.</p>{result.budget_exceeded && <strong>This plan is above your budget.</strong>}{isGenerating && <div className="loading-card"><span className="spinner" /><div><strong>Generating your itinerary</strong><p>Bedrock is finding the good stuff.</p></div></div>}{error && !isGenerating && <button className="retry-button" type="button" onClick={() => generateRecommendation(result.id)}>Try generating again</button>}</div>}
         </aside>
       </form>
-      {recommendation && <section id="itinerary" className="recommendation"><div className="recommendation-header"><div><p className="eyebrow">YOUR KELANAAI ITINERARY</p><h2>{recommendation.title || "A trip made for you."}</h2></div><span>{form.days} DAYS · {form.country.toUpperCase()}</span></div><div className="daily-grid">{recommendation.daily_itinerary.map((day) => <article className="daily-card" key={day.day}><div className="daily-card-top"><span>DAY {day.day}</span><strong>{day.estimated_cost.toLocaleString()} {form.currency}</strong></div><h3>{day.title}</h3>{[["Morning", day.morning], ["Afternoon", day.afternoon], ["Evening", day.evening]].map(([period, activities]) => <div className="activity-block" key={period as string}><h4>{period as string}</h4>{(activities as string[]).map((activity) => <p key={activity}>{activity}</p>)}</div>)}</article>)}</div><div className="recommendation-grid detail-grid"><article className="recommendation-card"><h3>Travel tips</h3>{recommendation.travel_tips.map((tip) => <p key={tip}>{tip}</p>)}</article><article className="recommendation-card"><h3>Local food</h3>{recommendation.local_food_recommendations.map((food) => <p key={food}>{food}</p>)}</article><article className="recommendation-card"><h3>Budget breakdown</h3>{Object.entries(recommendation.estimated_budget_breakdown).map(([label, amount]) => <p className="budget-line" key={label}><span>{label.replaceAll("_", " ")}</span><strong>{amount.toLocaleString()} {form.currency}</strong></p>)}</article><article className="recommendation-card"><h3>Assumptions</h3>{recommendation.assumptions.map((assumption) => <p key={assumption}>{assumption}</p>)}</article></div></section>}
+      {recommendation && <section id="itinerary" className="recommendation"><div className="recommendation-header"><div><p className="eyebrow">YOUR KELANAAI ITINERARY</p><h2>{recommendation.title || "A trip made for you."}</h2></div><div style={{ display: "flex", gap: "10px", alignItems: "center" }}><span>{form.days} DAYS · {form.country.toUpperCase()}</span><button type="button" className="copy-itinerary-button" onClick={() => {
+        const itineraryText = `${recommendation.title}\n\n${recommendation.daily_itinerary.map(day => `Day ${day.day}: ${day.title}\nMorning: ${day.morning.join(", ")}\nAfternoon: ${day.afternoon.join(", ")}\nEvening: ${day.evening.join(", ")}\nEstimated cost: ${day.estimated_cost} ${form.currency}\n`).join("\n")}\n\nTravel Tips:\n${recommendation.travel_tips.join("\n")}\n\nLocal Food:\n${recommendation.local_food_recommendations.join("\n")}`;
+        navigator.clipboard.writeText(itineraryText).then(() => {
+          alert("Itinerary copied to clipboard!");
+        }).catch(() => {
+          alert("Failed to copy itinerary");
+        });
+      }}>📋 Copy</button><button type="button" className="copy-itinerary-button" onClick={() => {
+        const shareData = {
+          title: recommendation.title || "My Travel Itinerary",
+          text: `Check out my ${form.days}-day trip to ${form.country} planned with KelanaAI!`,
+          url: window.location.href
+        };
+        if (navigator.share) {
+          navigator.share(shareData).catch(() => {});
+        } else {
+          alert("Sharing not supported on this browser");
+        }
+      }}>🔗 Share</button></div></div><div className="daily-grid">{recommendation.daily_itinerary.map((day) => <article className="daily-card" key={day.day}><div className="daily-card-top"><span>DAY {day.day}</span><strong>{day.estimated_cost.toLocaleString()} {form.currency}</strong></div><h3>{day.title}</h3>{[["Morning", day.morning], ["Afternoon", day.afternoon], ["Evening", day.evening]].map(([period, activities]) => <div className="activity-block" key={period as string}><h4>{period as string}</h4>{(activities as string[]).map((activity) => <p key={activity}>{activity}</p>)}</div>)}</article>)}</div><div className="recommendation-grid detail-grid"><article className="recommendation-card"><h3>Travel tips</h3>{recommendation.travel_tips.map((tip) => <p key={tip}>{tip}</p>)}</article><article className="recommendation-card"><h3>Local food</h3>{recommendation.local_food_recommendations.map((food) => <p key={food}>{food}</p>)}</article><article className="recommendation-card"><h3>Budget breakdown</h3>{Object.entries(recommendation.estimated_budget_breakdown).map(([label, amount]) => <p className="budget-line" key={label}><span>{label.replaceAll("_", " ")}</span><strong>{amount.toLocaleString()} {form.currency}</strong></p>)}</article><article className="recommendation-card"><h3>Assumptions</h3>{recommendation.assumptions.map((assumption) => <p key={assumption}>{assumption}</p>)}</article></div></section>}
       <footer className="mt-24 flex flex-col gap-5 border-t border-[#d9ded8] pt-7 text-sm text-[#71807a] md:flex-row md:items-center md:justify-between">
         <p className="m-0">© 2026 KelanaAI. Made for curious travelers.</p>
         <nav className="flex flex-wrap gap-5" aria-label="Footer navigation">

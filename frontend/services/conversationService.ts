@@ -4,6 +4,9 @@ export type Conversation = {
 	id: number;
 	title: string | null;
 	created_at: string;
+	updated_at: string;
+	last_message?: string | null;
+	last_message_role?: "user" | "assistant" | null;
 };
 
 export type ConversationMessage = {

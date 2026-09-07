@@ -8,7 +8,7 @@ import { register } from "@/services/authService";
 
 export default function RegisterPage() {
 	const router = useRouter();
-	const [form, setForm] = useState({ name: "Alice Johnson", email: "alice@email.com", password: "password123" });
+	const [form, setForm] = useState({ name: "", email: "", password: "" });
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [message, setMessage] = useState("");
 
@@ -20,6 +20,23 @@ export default function RegisterPage() {
 		event.preventDefault();
 		setIsSubmitting(true);
 		setMessage("");
+
+		// Client-side password validation
+		if (form.password.length < 8) {
+			setMessage("Password must be at least 8 characters long");
+			setIsSubmitting(false);
+			return;
+		}
+		if (!/[a-zA-Z]/.test(form.password)) {
+			setMessage("Password must contain at least one letter");
+			setIsSubmitting(false);
+			return;
+		}
+		if (!/\d/.test(form.password)) {
+			setMessage("Password must contain at least one number");
+			setIsSubmitting(false);
+			return;
+		}
 
 		try {
 			await register(form.name, form.email, form.password);
@@ -54,7 +71,10 @@ export default function RegisterPage() {
 
 						<label className="field">
 							<span>Password</span>
-							<input type="password" value={form.password} onChange={(event) => updateField("password", event.target.value)} placeholder="••••••••••" required />
+							<input type="password" value={form.password} onChange={(event) => updateField("password", event.target.value)} placeholder="••••••••••" required minLength={8} />
+							<small style={{ display: "block", marginTop: "6px", color: "var(--muted)", fontSize: "11px" }}>
+								At least 8 characters with letters and numbers
+							</small>
 						</label>
 
 						<button className="submit-button" type="submit" disabled={isSubmitting}>

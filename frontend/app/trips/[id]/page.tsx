@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DayCards from "@/components/DayCards";
-import { apiRequest, deleteTrip, type Recommendation, type Trip, type TripUpdate, updateTrip } from "@/services/tripService";
+import { apiRequest, deleteTrip, generateTrip, type Recommendation, type Trip, type TripUpdate, updateTrip } from "@/services/tripService";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -15,6 +15,7 @@ export default function TripDetailPage({ params }: Props) {
   const router = useRouter();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -22,9 +23,18 @@ export default function TripDetailPage({ params }: Props) {
   const [form, setForm] = useState<TripUpdate | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLoading(true);
+    setError("");
     apiRequest<Trip>(`/api/v1/trips/${Number(id)}`)
-      .then((data) => setTrip(data))
-      .catch((requestError) => setError(requestError instanceof Error ? requestError.message : "Unable to load this trip."));
+      .then((data) => {
+        setTrip(data);
+        setIsLoading(false);
+      })
+      .catch((requestError) => {
+        setError(requestError instanceof Error ? requestError.message : "Unable to load this trip.");
+        setIsLoading(false);
+      });
   }, [id]);
 
   const beginEditing = () => {
@@ -59,8 +69,31 @@ export default function TripDetailPage({ params }: Props) {
       const updatedTrip = await updateTrip(Number(id), form);
       setTrip(updatedTrip);
       setIsEditing(false);
+      
+      // Auto-regenerate itinerary with new trip details
+      await regenerateItinerary(updatedTrip);
     } catch (requestError) {
       setFormError(requestError instanceof Error ? requestError.message : "Unable to update this trip.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const regenerateItinerary = async (tripData?: Trip) => {
+    const targetTrip = tripData || trip;
+    if (!targetTrip) return;
+    
+    setIsSaving(true);
+    setFormError("");
+    try {
+      const response = await generateTrip(targetTrip.id);
+      // Update the trip with the new AI recommendations
+      setTrip({
+        ...targetTrip,
+        ai_recommendations: JSON.stringify(response.recommendation),
+      });
+    } catch (requestError) {
+      setFormError(requestError instanceof Error ? requestError.message : "Unable to regenerate itinerary.");
     } finally {
       setIsSaving(false);
     }
@@ -79,7 +112,73 @@ export default function TripDetailPage({ params }: Props) {
     }
   };
 
-  if (!trip) return <main className="detail-shell"><Navbar active="trips" /><div className={`empty-state ${error ? "error-state" : "compact"}`}><span className="empty-icon">{error ? "!" : "✦"}</span><h1>{error ? "Trip unavailable" : "Loading your trip…"}</h1>{error ? <p>{error}</p> : null}<Link className="primary-link" href={error ? "/login" : "/trips"}>{error ? "Go to login" : "Back to trips"} <span aria-hidden="true">→</span></Link></div></main>;
+  if (isLoading) {
+    return (
+      <main className="detail-shell">
+        <Navbar active="trips" />
+        <header className="detail-header">
+          <Link className="back-link" href="/trips">← Back to trips</Link>
+          <span className="eyebrow">LOADING TRIP...</span>
+        </header>
+        <div className="trip-detail-skeleton">
+          <div className="skeleton-hero">
+            <div className="skeleton-text skeleton-eyebrow"></div>
+            <div className="skeleton-text skeleton-title"></div>
+            <div className="skeleton-text skeleton-subtitle"></div>
+          </div>
+          <div className="skeleton-stats">
+            <div className="skeleton-stat"></div>
+            <div className="skeleton-stat"></div>
+            <div className="skeleton-stat"></div>
+            <div className="skeleton-stat"></div>
+          </div>
+          <div className="skeleton-content">
+            <div className="skeleton-text skeleton-full"></div>
+            <div className="skeleton-text skeleton-full"></div>
+            <div className="skeleton-text skeleton-medium"></div>
+          </div>
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="detail-shell">
+        <Navbar active="trips" />
+        <div className="empty-state error-state">
+          <span className="empty-icon">!</span>
+          <h1>Unable to load trip</h1>
+          <p>{error}</p>
+          <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+            <button 
+              className="primary-link" 
+              onClick={() => {
+                setError("");
+                setIsLoading(true);
+                apiRequest<Trip>(`/api/v1/trips/${Number(id)}`)
+                  .then((data) => {
+                    setTrip(data);
+                    setIsLoading(false);
+                  })
+                  .catch((requestError) => {
+                    setError(requestError instanceof Error ? requestError.message : "Unable to load this trip.");
+                    setIsLoading(false);
+                  });
+              }}
+            >
+              Try again
+            </button>
+            <Link className="secondary-link" href="/trips">Back to trips</Link>
+          </div>
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+
+  if (!trip) return null;
 
   let recommendation: Recommendation | null = null;
   if (trip.ai_recommendations) {
@@ -89,14 +188,36 @@ export default function TripDetailPage({ params }: Props) {
     return <main className="detail-shell">
       <Navbar active="trips" />
       <header className="detail-header"><Link className="back-link" href="/trips">← Back to trips</Link><span className="eyebrow">TRIP #{trip.id} · {trip.season}</span></header>
-      <div className="detail-actions"><button type="button" className="secondary-link" onClick={beginEditing}>Edit trip</button><button type="button" className="danger-button" onClick={removeTrip} disabled={isDeleting}>{isDeleting ? "Deleting…" : "Delete trip"}</button></div>
+      <div className="detail-actions">
+        <button type="button" className="secondary-link" onClick={beginEditing}>Edit trip</button>
+        {recommendation && (
+          <button 
+            type="button" 
+            className="regenerate-button" 
+            onClick={() => regenerateItinerary()}
+            disabled={isSaving}
+          >
+            {isSaving ? "Regenerating..." : "Regenerate itinerary"}
+          </button>
+        )}
+        <button type="button" className="danger-button" onClick={removeTrip} disabled={isDeleting}>{isDeleting ? "Deleting…" : "Delete trip"}</button>
+      </div>
       {formError ? <p className="status error">{formError}</p> : null}
+      {isSaving && !isEditing && (
+        <div className="regeneration-notice">
+          <span className="spinner" />
+          <div>
+            <strong>Regenerating your itinerary</strong>
+            <p>KelanaAI is creating a fresh plan based on your updated details...</p>
+          </div>
+        </div>
+      )}
       {isEditing && form ? <form className="trip-edit-form" onSubmit={saveTrip}>
         <div className="detail-section-heading"><p className="eyebrow">EDIT SAVED TRIP</p><h2>Refine the journey</h2></div>
         <div className="edit-grid">
           <label className="field field-wide"><span>Destinations</span><input value={form.destinations.join(", ")} onChange={(event) => updateField("destinations", event.target.value.split(",").map((destination) => destination.trim()).filter(Boolean))} required /></label>
           <label className="field"><span>Country</span><input value={form.country} onChange={(event) => updateField("country", event.target.value)} required /></label>
-          <label className="field"><span>Travel style</span><input value={form.travel_style} onChange={(event) => updateField("travel_style", event.target.value)} required /></label>
+          <label className="field field-wide"><span>Travel style</span><select value={form.travel_style} onChange={(event) => updateField("travel_style", event.target.value)} required>{["Cultural explorer", "Slow & local", "Outdoor adventure", "Food & nightlife", "Luxury escape"].map((style) => <option key={style} value={style}>{style}</option>)}</select></label>
           <label className="field"><span>Budget</span><input type="number" min="0" value={form.budget} onChange={(event) => updateField("budget", Number(event.target.value))} required /></label>
           <label className="field"><span>Days</span><input type="number" min="1" value={form.days} onChange={(event) => updateField("days", Number(event.target.value))} required /></label>
           <label className="field"><span>Travel month</span><input value={form.travel_month} onChange={(event) => updateField("travel_month", event.target.value)} required /></label>
@@ -106,7 +227,7 @@ export default function TripDetailPage({ params }: Props) {
           <label className="field"><span>Food cost</span><input type="number" min="0" value={form.food_cost ?? ""} onChange={(event) => updateField("food_cost", event.target.value === "" ? null : Number(event.target.value))} /></label>
           <label className="field"><span>Miscellaneous cost</span><input type="number" min="0" value={form.miscellaneous_cost ?? ""} onChange={(event) => updateField("miscellaneous_cost", event.target.value === "" ? null : Number(event.target.value))} /></label>
         </div>
-        <div className="edit-actions"><button type="submit" className="submit-button" disabled={isSaving}>{isSaving ? "Saving…" : "Save changes"}</button><button type="button" className="secondary-link" onClick={() => setIsEditing(false)} disabled={isSaving}>Cancel</button></div>
+        <div className="edit-actions"><button type="submit" className="submit-button" disabled={isSaving}>{isSaving ? (isEditing ? "Saving & regenerating..." : "Regenerating itinerary...") : "Save changes"}</button><button type="button" className="secondary-link" onClick={() => setIsEditing(false)} disabled={isSaving}>Cancel</button></div>
       </form> : null}
     <section className="detail-hero"><div><p className="eyebrow">{trip.category} journey</p><h1>{trip.destinations.join(" · ")}</h1><p className="detail-lede">{trip.days} days in {trip.country}, designed for a {trip.travel_style.toLowerCase()}.</p></div><div className="detail-stat"><strong>{trip.budget.toLocaleString()} {trip.currency}</strong><span>total budget</span></div></section>
     <section className="trip-facts"><div><span>Destination</span><strong>{trip.country}</strong></div><div><span>Daily budget</span><strong>{trip.daily_budget.toLocaleString()} {trip.currency}</strong></div><div><span>Transport</span><strong>{trip.recommendation_transport}</strong></div><div><span>Estimate</span><strong className={trip.budget_exceeded ? "over-budget" : ""}>{trip.total_estimated_cost.toLocaleString()} {trip.currency}</strong></div></section>

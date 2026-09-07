@@ -9,6 +9,12 @@ load_dotenv()
 # connection string from .env — never hardcode secrets
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL environment variable is not set. "
+        "Please check your .env file and ensure DATABASE_URL is configured."
+    )
+
 # engine = the connection pool
 engine = create_engine(DATABASE_URL)
 

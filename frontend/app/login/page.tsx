@@ -8,8 +8,8 @@ import { login, saveAuthToken } from "@/services/authService";
 
 export default function LoginPage() {
 	const router = useRouter();
-	const [email, setEmail] = useState("alice@email.com");
-	const [password, setPassword] = useState("password123");
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [message, setMessage] = useState("");
 

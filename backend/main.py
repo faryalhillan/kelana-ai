@@ -52,6 +52,17 @@ class RegisterRequest(BaseModel):
             raise ValueError("Invalid email address")
         return v.lower().strip()
 
+    @field_validator("password")
+    @classmethod
+    def password_must_be_strong(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not any(c.isalpha() for c in v):
+            raise ValueError("Password must contain at least one letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
 class LoginRequest(BaseModel):
     email:    str
     password: str
@@ -152,7 +163,7 @@ def me(current_user: User = Depends(get_current_user)):
     }
 
 @app.post("/api/v1/ask")
-def ask(request: AskRequest):
+def ask(request: AskRequest, current_user: User = Depends(get_current_user)):
     try:
         result = retrieve_and_generate(request.question)
     except ValueError as e:
@@ -181,9 +192,28 @@ def create_conversation(current_user: User = Depends(get_current_user)):
 def list_conversations(current_user: User = Depends(get_current_user)):
     db = SessionLocal()
     try:
-        return db.query(Conversation).filter(
+        conversations = db.query(Conversation).filter(
             Conversation.user_id == current_user.id,
-        ).all()
+        ).order_by(Conversation.updated_at.desc()).all()
+        
+        # Enhance each conversation with last message preview
+        result = []
+        for conv in conversations:
+            last_message = db.query(Message).filter(
+                Message.conversation_id == conv.id
+            ).order_by(Message.created_at.desc()).first()
+            
+            conv_dict = {
+                "id": conv.id,
+                "title": conv.title,
+                "created_at": conv.created_at,
+                "updated_at": conv.updated_at,
+                "last_message": last_message.content[:80] + "..." if last_message and len(last_message.content) > 80 else last_message.content if last_message else None,
+                "last_message_role": last_message.role if last_message else None,
+            }
+            result.append(conv_dict)
+        
+        return result
     finally:
         db.close()
 
@@ -337,6 +367,8 @@ def create_trip(
     )
     budget_exceeded = total_estimated_cost > request.budget
     daily_budget = calculate_daily_budget(request.budget, request.days)
+    
+    # Temporary fallback values - will be overridden by AI after generation
     category = get_trip_category(request.budget)
     transportation = get_transportation_recommendation(category)
     season = get_season(request.travel_month)
@@ -402,14 +434,16 @@ def update_trip(trip_id: int, request: TripRequest, current_user: User = Depends
     db = SessionLocal()
 
     try:
-        trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        trip = db.query(Trip).filter(
+            Trip.id == trip_id,
+            Trip.user_id == current_user.id,
+        ).first()
+        
         if trip is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Trip {trip_id} not found"
             )
-        if trip.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="You do not own this trip")
 
         if request.budget is not None:
             trip.budget = request.budget
@@ -450,14 +484,17 @@ def delete_trip(trip_id: int, current_user: User = Depends(get_current_user)):
     db = SessionLocal()
 
     try:
-        trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        trip = db.query(Trip).filter(
+            Trip.id == trip_id,
+            Trip.user_id == current_user.id,
+        ).first()
+        
         if trip is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Trip {trip_id} not found"
             )
-        if trip.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="You do not own this trip")
+            
         db.delete(trip)
         db.commit()
         return {"message": f"Trip with id {trip_id} deleted successfully"}
@@ -492,8 +529,42 @@ def generate_ai_recommendations(
             budget=trip.budget,
             travel_style=trip.travel_style,
             travel_month=trip.travel_month,
+            hotel_cost=trip.hotel_cost,
+            transportation_cost=trip.transportation_cost,
+            food_cost=trip.food_cost,
+            miscellaneous_cost=trip.miscellaneous_cost,
         )
         trip.ai_recommendations = json.dumps(recommendation)
+        
+        # Extract AI-generated metadata and update trip
+        if "category" in recommendation:
+            trip.category = recommendation["category"]
+        if "season" in recommendation:
+            trip.season = recommendation["season"]
+        if "recommended_transport" in recommendation:
+            trip.recommendation_transport = recommendation["recommended_transport"]
+        
+        # If user didn't provide cost breakdown, use AI's estimates
+        if "estimated_budget_breakdown" in recommendation:
+            breakdown = recommendation["estimated_budget_breakdown"]
+            if trip.hotel_cost is None and "accommodation" in breakdown:
+                trip.hotel_cost = breakdown["accommodation"]
+            if trip.transportation_cost is None and "transport" in breakdown:
+                trip.transportation_cost = breakdown["transport"]
+            if trip.food_cost is None and "food" in breakdown:
+                trip.food_cost = breakdown["food"]
+            if trip.miscellaneous_cost is None and ("activities" in breakdown or "other" in breakdown):
+                trip.miscellaneous_cost = breakdown.get("activities", 0) + breakdown.get("other", 0)
+            
+            # Recalculate totals with AI values
+            trip.total_estimated_cost = calculate_total_cost(
+                trip.hotel_cost,
+                trip.transportation_cost,
+                trip.food_cost,
+                trip.miscellaneous_cost,
+            )
+            trip.budget_exceeded = trip.total_estimated_cost > trip.budget
+        
         db.commit()
         return {
             "trip_id": trip.id,
