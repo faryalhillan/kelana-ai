@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { getAuthToken, getProfile } from "@/services/authService";
 import { apiRequest } from "@/services/tripService";
 
@@ -138,7 +139,7 @@ export default function Home() {
 
   return (
     <main className="planner-shell">
-      <Navbar active="" />
+      <Navbar active="planner" />
       {welcomeName ? (
         <div className="welcome-banner" aria-live="polite">
           Welcome back, {welcomeName} 👋
@@ -202,15 +203,8 @@ export default function Home() {
           alert("Sharing not supported on this browser");
         }
       }}>🔗 Share</button></div></div><div className="daily-grid">{recommendation.daily_itinerary.map((day) => <article className="daily-card" key={day.day}><div className="daily-card-top"><span>DAY {day.day}</span><strong>{day.estimated_cost.toLocaleString()} {form.currency}</strong></div><h3>{day.title}</h3>{[["Morning", day.morning], ["Afternoon", day.afternoon], ["Evening", day.evening]].map(([period, activities]) => <div className="activity-block" key={period as string}><h4>{period as string}</h4>{(activities as string[]).map((activity) => <p key={activity}>{activity}</p>)}</div>)}</article>)}</div><div className="recommendation-grid detail-grid"><article className="recommendation-card"><h3>Travel tips</h3>{recommendation.travel_tips.map((tip) => <p key={tip}>{tip}</p>)}</article><article className="recommendation-card"><h3>Local food</h3>{recommendation.local_food_recommendations.map((food) => <p key={food}>{food}</p>)}</article><article className="recommendation-card"><h3>Budget breakdown</h3>{Object.entries(recommendation.estimated_budget_breakdown).map(([label, amount]) => <p className="budget-line" key={label}><span>{label.replaceAll("_", " ")}</span><strong>{amount.toLocaleString()} {form.currency}</strong></p>)}</article><article className="recommendation-card"><h3>Assumptions</h3>{recommendation.assumptions.map((assumption) => <p key={assumption}>{assumption}</p>)}</article></div></section>}
-      <footer className="mt-24 flex flex-col gap-5 border-t border-[#d9ded8] pt-7 text-sm text-[#71807a] md:flex-row md:items-center md:justify-between">
-        <p className="m-0">© 2026 KelanaAI. Made for curious travelers.</p>
-        <nav className="flex flex-wrap gap-5" aria-label="Footer navigation">
-          <Link className="transition-colors hover:text-[#e76f51]" href="/trips">My trips</Link>
-          <a className="transition-colors hover:text-[#e76f51]" href="#planner">Plan a trip</a>
-          <a className="transition-colors hover:text-[#e76f51]" href="#itinerary">Your itinerary</a>
-          <a className="transition-colors hover:text-[#e76f51]" href="mailto:hello@kelana.ai">Contact</a>
-        </nav>
-      </footer>
+      <Footer />
     </main>
   );
 }
+

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { login, saveAuthToken } from "@/services/authService";
 
 export default function LoginPage() {
@@ -63,6 +64,7 @@ export default function LoginPage() {
 					</div>
 				</div>
 			</section>
+			<Footer />
 		</main>
 	);
 }

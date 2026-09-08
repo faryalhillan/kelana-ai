@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, DateTime, ForeignKey, String, Text
+from sqlalchemy import Column, BigInteger, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -9,6 +9,7 @@ class Conversation(Base):
 
     id         = Column(BigInteger, primary_key=True, autoincrement=True)
     user_id    = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    trip_id    = Column(Integer, ForeignKey("trips.id", ondelete="CASCADE"), nullable=True, index=True)
     title      = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

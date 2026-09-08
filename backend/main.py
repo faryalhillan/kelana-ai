@@ -11,6 +11,7 @@ from services.trip_service import calculate_total_cost, calculate_daily_budget, 
 from services.bedrock_service import get_ai_recommendations, get_chat_response
 from services.auth_service import register_user, login_user, get_current_user
 from services.kb_service import retrieve_and_generate
+from services.refinement_service import get_trip_refinement_response
 
 from models.trip import Trip
 from models.user import User
@@ -90,6 +91,9 @@ class ConversationUpdateRequest(BaseModel):
         if not title:
             raise ValueError("Conversation title is required")
         return title[:100]
+
+class ApplyChangesRequest(BaseModel):
+    proposed_changes: dict
 
 # App Setup
 
@@ -498,6 +502,219 @@ def delete_trip(trip_id: int, current_user: User = Depends(get_current_user)):
         db.delete(trip)
         db.commit()
         return {"message": f"Trip with id {trip_id} deleted successfully"}
+    finally:
+        db.close()
+
+
+# ── Trip refinement endpoints ────────────────────────────────────────────────
+
+@app.get("/api/v1/trips/{trip_id}/conversation")
+def get_or_create_trip_conversation(
+    trip_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Get the existing conversation for this trip, or create one if it doesn't exist."""
+    db = SessionLocal()
+    try:
+        # Verify trip ownership
+        trip = db.query(Trip).filter(
+            Trip.id == trip_id,
+            Trip.user_id == current_user.id,
+        ).first()
+        if trip is None:
+            raise HTTPException(status_code=404, detail=f"Trip {trip_id} not found")
+        
+        # Find existing conversation for this trip
+        conversation = db.query(Conversation).filter(
+            Conversation.trip_id == trip_id,
+            Conversation.user_id == current_user.id,
+        ).first()
+        
+        # Create if doesn't exist
+        if conversation is None:
+            conversation = Conversation(
+                user_id=current_user.id,
+                trip_id=trip_id,
+                title=f"Refining {trip.destinations[0] if trip.destinations else trip.country} trip",
+            )
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+        
+        return {
+            "conversation_id": conversation.id,
+            "trip_id": trip_id,
+        }
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/trips/{trip_id}/refine", status_code=201)
+def refine_trip(
+    trip_id: int,
+    request: MessageRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Send a refinement request for the trip itinerary."""
+    db = SessionLocal()
+    try:
+        # Get trip
+        trip = db.query(Trip).filter(
+            Trip.id == trip_id,
+            Trip.user_id == current_user.id,
+        ).first()
+        if trip is None:
+            raise HTTPException(status_code=404, detail=f"Trip {trip_id} not found")
+        
+        # Get or create conversation for this trip
+        conversation = db.query(Conversation).filter(
+            Conversation.trip_id == trip_id,
+            Conversation.user_id == current_user.id,
+        ).first()
+        
+        if conversation is None:
+            conversation = Conversation(
+                user_id=current_user.id,
+                trip_id=trip_id,
+                title=f"Refining {trip.destinations[0] if trip.destinations else trip.country} trip",
+            )
+            db.add(conversation)
+            db.flush()
+        
+        # Save user message
+        user_message = Message(
+            conversation_id=conversation.id,
+            role="user",
+            content=request.content,
+        )
+        db.add(user_message)
+        db.flush()
+        
+        # Get conversation history
+        messages = db.query(Message).filter(
+            Message.conversation_id == conversation.id,
+        ).order_by(Message.created_at, Message.id).all()
+        
+        prompt = [
+            {
+                "role": message.role,
+                "content": message.content,
+            }
+            for message in messages
+        ]
+        
+        # Prepare trip context
+        trip_context = {
+            "id": trip.id,
+            "destinations": trip.destinations,
+            "country": trip.country,
+            "days": trip.days,
+            "budget": trip.budget,
+            "currency": trip.currency,
+            "travel_style": trip.travel_style,
+            "travel_month": trip.travel_month,
+            "category": trip.category,
+            "ai_recommendations": trip.ai_recommendations,
+            "trip_preferences": trip.trip_preferences,
+        }
+        
+        # Get AI refinement response
+        result = get_trip_refinement_response(prompt, trip_context)
+        
+        # Save assistant message
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=result["response_text"],
+        )
+        db.add(assistant_message)
+        
+        # Save preferences if any
+        if result.get("preferences_to_save"):
+            existing_prefs = []
+            if trip.trip_preferences:
+                try:
+                    existing_prefs = json.loads(trip.trip_preferences)
+                except:
+                    existing_prefs = []
+            
+            # Merge new preferences
+            all_prefs = list(set(existing_prefs + result["preferences_to_save"]))
+            trip.trip_preferences = json.dumps(all_prefs)
+        
+        db.commit()
+        db.refresh(user_message)
+        db.refresh(assistant_message)
+        
+        return {
+            "conversation_id": conversation.id,
+            "message_id": user_message.id,
+            "assistant_message_id": assistant_message.id,
+            "response_text": result["response_text"],
+            "requires_changes": result.get("requires_changes", False),
+            "proposed_changes": result.get("proposed_changes"),
+        }
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/trips/{trip_id}/apply-changes")
+def apply_trip_changes(
+    trip_id: int,
+    request: ApplyChangesRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Apply proposed changes to the trip itinerary."""
+    db = SessionLocal()
+    try:
+        trip = db.query(Trip).filter(
+            Trip.id == trip_id,
+            Trip.user_id == current_user.id,
+        ).first()
+        if trip is None:
+            raise HTTPException(status_code=404, detail=f"Trip {trip_id} not found")
+        
+        # Get current recommendations
+        if not trip.ai_recommendations:
+            raise HTTPException(status_code=400, detail="Trip has no itinerary to modify")
+        
+        current_recs = json.loads(trip.ai_recommendations)
+        proposed_changes = request.proposed_changes
+        
+        # Apply changes to daily_itinerary
+        if "daily_itinerary" in proposed_changes:
+            # Create a map of day -> new activities
+            changes_by_day = {item["day"]: item for item in proposed_changes["daily_itinerary"]}
+            
+            # Update or append days
+            existing_days = {item["day"]: item for item in current_recs.get("daily_itinerary", [])}
+            for day_num, new_day in changes_by_day.items():
+                existing_days[day_num] = new_day
+            
+            # Rebuild sorted daily itinerary
+            current_recs["daily_itinerary"] = sorted(
+                existing_days.values(),
+                key=lambda x: x["day"]
+            )
+        
+        # Save updated recommendations
+        trip.ai_recommendations = json.dumps(current_recs)
+        db.commit()
+        db.refresh(trip)
+        
+        return {
+            "trip_id": trip.id,
+            "message": "Changes applied successfully",
+            "updated_recommendation": current_recs,
+        }
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid itinerary format")
     finally:
         db.close()
 

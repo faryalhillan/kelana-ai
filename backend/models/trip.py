@@ -29,5 +29,6 @@ class Trip(Base):
     travel_style                = Column(String, nullable=False)
     created_at                  = Column(DateTime(timezone=True), server_default = func.now(), nullable=False)
     ai_recommendations          = Column(Text, nullable=True)
+    trip_preferences            = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="trips")

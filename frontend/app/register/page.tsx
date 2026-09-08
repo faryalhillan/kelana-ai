@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { register } from "@/services/authService";
 
 export default function RegisterPage() {
@@ -90,6 +91,7 @@ export default function RegisterPage() {
 					</div>
 				</div>
 			</section>
+			<Footer />
 		</main>
 	);
 }

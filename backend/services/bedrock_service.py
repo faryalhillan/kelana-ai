@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Optional, Sequence
 
@@ -7,6 +8,9 @@ from botocore.client import BaseClient
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 AWS_BEARER_TOKEN_BEDROCK = os.getenv("AWS_BEARER_TOKEN_BEDROCK")
 AWS_REGION = os.getenv("AWS_REGION", "ap-southeast-2")
@@ -79,8 +83,14 @@ def get_ai_recommendations(
     Month: {travel_month}
     {budget_guidance}
 
-        Return ONLY valid JSON. Do not use Markdown, code fences, or meta-commentary.
-        Use exactly this shape:
+        CRITICAL RESPONSE FORMAT:
+        - Return ONLY raw JSON - no markdown, no code blocks, no ```json wrapper
+        - Do NOT include any explanatory text before or after the JSON
+        - Do NOT wrap the response in backticks or markdown
+        - Start your response with {{ and end with }}
+        - The entire response must be parseable as JSON
+        
+        Use exactly this JSON structure:
         {{
             "title": "Short itinerary title",
             "daily_itinerary": [
@@ -113,6 +123,8 @@ def get_ai_recommendations(
         Analyze the budget ({currency} {budget}) and travel style to determine if this is a backpacker, standard, or luxury trip.
         Consider {travel_month} weather and tourist patterns in {country} for the season field.
         Recommend transportation that fits the budget and destination (e.g., public transit for budget trips, rental car for road trips, domestic flights for luxury).
+        
+        Remember: Return ONLY the JSON object, nothing else.
     """
 
     bedrock_client = client or configure_bedrock()
@@ -130,10 +142,44 @@ def get_ai_recommendations(
         ],
     )
     raw_recommendation = response["output"]["message"]["content"][0]["text"].strip()
+    
+    # Clean up common LLM response patterns that interfere with JSON parsing
+    cleaned = raw_recommendation
+    
+    # Remove markdown code fences if present
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:]  # Remove ```json
+    elif cleaned.startswith("```"):
+        cleaned = cleaned[3:]  # Remove ```
+    
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]  # Remove trailing ```
+    
+    cleaned = cleaned.strip()
+    
+    # Try to find JSON object boundaries if there's extra text
+    if not cleaned.startswith("{"):
+        # Look for the first {
+        start_idx = cleaned.find("{")
+        if start_idx != -1:
+            cleaned = cleaned[start_idx:]
+    
+    if not cleaned.endswith("}"):
+        # Look for the last }
+        end_idx = cleaned.rfind("}")
+        if end_idx != -1:
+            cleaned = cleaned[:end_idx + 1]
+    
     try:
-        return json.loads(raw_recommendation)
+        parsed_json = json.loads(cleaned)
+        logger.info(f"Successfully parsed Bedrock itinerary response for {destination_text}")
+        return parsed_json
     except json.JSONDecodeError as error:
-        raise ValueError("Bedrock returned invalid itinerary JSON") from error
+        # Log the actual response for debugging
+        logger.error(f"Failed to parse Bedrock response. Error: {error}")
+        logger.error(f"Raw response (first 1000 chars): {raw_recommendation[:1000]}")
+        logger.error(f"Cleaned response (first 1000 chars): {cleaned[:1000]}")
+        raise ValueError(f"Bedrock returned invalid itinerary JSON. Response started with: {raw_recommendation[:100]}") from error
 
 def get_chat_response(prompt: list[dict[str, str]]) -> str:
     """
