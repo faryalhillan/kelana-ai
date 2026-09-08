@@ -1,5 +1,5 @@
 import LoadingScreen from "@/components/LoadingScreen";
 
 export default function Loading() {
-	return <LoadingScreen message="Loading KelanaAI..." fullScreen />;
+	return <LoadingScreen message="Loading KelanaAI..." fullscreen />;
 }

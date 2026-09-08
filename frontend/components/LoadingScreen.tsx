@@ -1,28 +1,25 @@
+import { Loader2 } from "lucide-react";
+
 type LoadingScreenProps = {
-	message?: string;
-	fullScreen?: boolean;
+  fullscreen?: boolean;
+  message?: string;
 };
 
-export default function LoadingScreen({ 
-	message = "Loading...", 
-	fullScreen = false 
-}: LoadingScreenProps) {
-	return (
-		<div className={`loading-screen ${fullScreen ? "fullscreen" : ""}`}>
-			<div className="loading-screen-content">
-				<div className="loading-brand">
-					<div className="loading-brand-mark">K</div>
-					<div className="loading-pulse-ring"></div>
-					<div className="loading-pulse-ring delay-1"></div>
-					<div className="loading-pulse-ring delay-2"></div>
-				</div>
-				<p className="loading-message">{message}</p>
-				<div className="loading-dots">
-					<span></span>
-					<span></span>
-					<span></span>
-				</div>
-			</div>
-		</div>
-	);
+export default function LoadingScreen({ fullscreen = false, message = "Loading..." }: LoadingScreenProps) {
+  return (
+    <div className={`loading-screen ${fullscreen ? "fullscreen" : ""}`}>
+      <div className="loading-screen-content">
+        <div className="loading-brand">
+          <div className="loading-brand-mark">
+            <span>K</span>
+          </div>
+          <Loader2 
+            className="absolute w-full h-full animate-spin text-coral" 
+            style={{ opacity: 0.3 }} 
+          />
+        </div>
+        <p className="text-muted font-medium">{message}</p>
+      </div>
+    </div>
+  );
 }

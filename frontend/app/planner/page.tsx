@@ -2,7 +2,6 @@
 
 import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -146,15 +145,34 @@ export default function Home() {
           Welcome back, {welcomeName} 👋
         </div>
       ) : null}
-      <section className="hero-banner relative isolate flex min-h-[360px] items-end overflow-hidden rounded-[2rem] p-6 text-white md:min-h-[430px] md:p-10">
-        <Image className="absolute inset-0 -z-20 h-full w-full object-cover" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1800&q=85" alt="Traditional Kyoto street surrounded by autumn trees" fill priority sizes="(max-width: 760px) 100vw, 1100px" />
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(15,35,30,.82),rgba(15,35,30,.18))]" />
-        <div className="max-w-2xl">
-          <p className="eyebrow text-[#f4a28d]">TRIP DESIGN STUDIO <span>✦</span></p>
-          <h1 className="mb-5 max-w-xl text-5xl leading-[.98] tracking-[-.06em] md:text-7xl">Plan somewhere<br /><em>worth remembering.</em></h1>
-          <p className="max-w-md text-base leading-7 text-white/80">Tell us what moves you. We&apos;ll turn the details into a trip with a little more soul.</p>
+
+      {/* Planner header — clean, tool-focused */}
+      <header className="planner-page-header">
+        <div className="planner-page-header-text">
+          <p className="eyebrow">TRIP DESIGN STUDIO</p>
+          <h1 className="planner-page-title">
+            Where are we<br />
+            <span className="planner-page-accent">going next?</span>
+          </h1>
+          <p className="planner-page-sub">Fill in the details below and KelanaAI will build your itinerary.</p>
         </div>
-      </section>
+        <div className="planner-page-header-meta">
+          <div className="planner-meta-item">
+            <span className="planner-meta-value">60s</span>
+            <span className="planner-meta-label">to generate</span>
+          </div>
+          <div className="planner-meta-divider" />
+          <div className="planner-meta-item">
+            <span className="planner-meta-value">AI</span>
+            <span className="planner-meta-label">powered</span>
+          </div>
+          <div className="planner-meta-divider" />
+          <div className="planner-meta-item">
+            <span className="planner-meta-value">Free</span>
+            <span className="planner-meta-label">always</span>
+          </div>
+        </div>
+      </header>
 
       <form id="planner" className="trip-form mt-8 md:mt-12" onSubmit={submitTrip}>
         <div className="form-column">

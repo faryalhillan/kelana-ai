@@ -62,28 +62,31 @@ export function processInlineFormatting(text: string, keyPrefix: string) {
 }
 
 /**
- * Render markdown text with support for headers, lists, and inline formatting
+ * Render markdown text with support for headers, lists, inline formatting and newlines
  */
 export function renderMarkdown(text: string) {
-	const lines = text.split("\n");
+	// Normalise Windows-style line endings
+	const normalised = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+	const lines = normalised.split("\n");
 	const elements: React.ReactNode[] = [];
 	let i = 0;
 
 	while (i < lines.length) {
 		const line = lines[i];
 
-		// Skip empty lines
+		// Empty line → visual spacer (preserves paragraph breaks)
 		if (!line.trim()) {
+			elements.push(<br key={`br-${i}`} />);
 			i++;
 			continue;
 		}
 
-		// Check for headers
+		// Headers
 		const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
 		if (headerMatch) {
 			const level = headerMatch[1].length;
 			const content = headerMatch[2];
-			const Tag = `h${Math.min(level + 2, 6)}`;
+			const Tag = `h${Math.min(level + 2, 6)}` as React.ElementType;
 
 			elements.push(
 				React.createElement(
@@ -92,8 +95,9 @@ export function renderMarkdown(text: string) {
 						key: `h-${i}`,
 						style: {
 							marginTop: level === 1 ? "1.2em" : "1em",
-							marginBottom: "0.5em",
+							marginBottom: "0.4em",
 							fontWeight: "700",
+							color: "var(--ink)",
 						},
 					},
 					processInlineFormatting(content, `h-${i}`)
@@ -103,7 +107,14 @@ export function renderMarkdown(text: string) {
 			continue;
 		}
 
-		// Check for unordered list
+		// Horizontal rule
+		if (line.match(/^---+$/)) {
+			elements.push(<hr key={`hr-${i}`} style={{ border: "none", borderTop: "1px solid var(--line)", margin: "1em 0" }} />);
+			i++;
+			continue;
+		}
+
+		// Unordered list — collect consecutive list items
 		if (line.match(/^\s*[-*]\s+/)) {
 			const listItems: string[] = [];
 			while (i < lines.length && lines[i].match(/^\s*[-*]\s+/)) {
@@ -111,7 +122,7 @@ export function renderMarkdown(text: string) {
 				i++;
 			}
 			elements.push(
-				<ul key={`ul-${i}`} style={{ marginLeft: "1.5em", marginBottom: "0.8em" }}>
+				<ul key={`ul-${i}`} style={{ marginLeft: "1.5em", marginBottom: "0.8em", marginTop: "0.4em" }}>
 					{listItems.map((item, idx) => (
 						<li key={idx} style={{ marginBottom: "0.3em" }}>
 							{processInlineFormatting(item, `ul-${i}-${idx}`)}
@@ -122,7 +133,7 @@ export function renderMarkdown(text: string) {
 			continue;
 		}
 
-		// Check for ordered list
+		// Ordered list — collect consecutive list items
 		if (line.match(/^\s*\d+\.\s+/)) {
 			const listItems: string[] = [];
 			while (i < lines.length && lines[i].match(/^\s*\d+\.\s+/)) {
@@ -130,7 +141,7 @@ export function renderMarkdown(text: string) {
 				i++;
 			}
 			elements.push(
-				<ol key={`ol-${i}`} style={{ marginLeft: "1.5em", marginBottom: "0.8em" }}>
+				<ol key={`ol-${i}`} style={{ marginLeft: "1.5em", marginBottom: "0.8em", marginTop: "0.4em" }}>
 					{listItems.map((item, idx) => (
 						<li key={idx} style={{ marginBottom: "0.3em" }}>
 							{processInlineFormatting(item, `ol-${i}-${idx}`)}
@@ -141,23 +152,24 @@ export function renderMarkdown(text: string) {
 			continue;
 		}
 
-		// Regular paragraph - collect consecutive non-special lines
-		let paragraph = line;
-		i++;
+		// Regular paragraph — collect consecutive non-special lines (stop at blank, header, list)
+		const paragraphLines: string[] = [];
 		while (
 			i < lines.length &&
 			lines[i].trim() &&
-			!lines[i].match(/^(#{1,6}\s+|\s*[-*]\s+|\s*\d+\.\s+)/)
+			!lines[i].match(/^(#{1,6}\s+|\s*[-*]\s+|\s*\d+\.\s+|---+$)/)
 		) {
-			paragraph += " " + lines[i];
+			paragraphLines.push(lines[i]);
 			i++;
 		}
 
-		elements.push(
-			<p key={`p-${i}`} style={{ marginBottom: "0.8em" }}>
-				{processInlineFormatting(paragraph, `p-${i}`)}
-			</p>
-		);
+		if (paragraphLines.length > 0) {
+			elements.push(
+				<p key={`p-${i}`} style={{ marginBottom: "0.8em", lineHeight: "1.7" }}>
+					{processInlineFormatting(paragraphLines.join(" "), `p-${i}`)}
+				</p>
+			);
+		}
 	}
 
 	return <>{elements}</>;

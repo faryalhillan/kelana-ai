@@ -11,6 +11,7 @@ export type UserProfile = {
 	name: string;
 	email: string;
 	created_at: string;
+	theme_preference?: string;
 	total_trips: number;
 };
 

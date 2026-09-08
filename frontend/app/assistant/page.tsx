@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import AuthGuard from "@/components/AuthGuard";
 import { apiRequest } from "@/services/tripService";
 import { renderMarkdown } from "@/utils/markdown";
+import { Send, ArrowRight, FileText, AlertCircle, Sparkles } from "lucide-react";
 
 type Source = {
 	document_id: string;
@@ -110,7 +111,8 @@ export default function AssistantPage() {
 								</>
 							) : (
 								<>
-									Ask <span aria-hidden="true">→</span>
+									Ask
+									<Send size={18} />
 								</>
 							)}
 						</button>
@@ -119,7 +121,9 @@ export default function AssistantPage() {
 
 				{error && (
 					<div className="status-message error-message">
-						<span className="status-icon">⚠</span>
+						<span className="status-icon">
+							<AlertCircle size={20} />
+						</span>
 						<div>
 							<strong>Unable to find answer</strong>
 							<p>{error}</p>
@@ -142,7 +146,7 @@ export default function AssistantPage() {
 						{response.source && response.source.length > 0 && (
 							<div className="sources-card">
 								<h3 className="sources-header">
-									<span className="sources-icon">📄</span>
+									<FileText size={20} />
 									Source
 								</h3>
 								<div className="sources-list">
@@ -179,7 +183,9 @@ export default function AssistantPage() {
 
 				{!response && !error && !isLoading && (
 					<div className="empty-state">
-						<span className="empty-icon">✦</span>
+						<span className="empty-icon">
+							<Sparkles size={32} />
+						</span>
 						<h2>Your travel assistant awaits</h2>
 						<p>Ask any question about your travel plans or destination guidelines.</p>
 					</div>

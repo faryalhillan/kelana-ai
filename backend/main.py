@@ -78,6 +78,16 @@ class LoginRequest(BaseModel):
 class AskRequest(BaseModel):
     question: str
 
+class UserPreferencesRequest(BaseModel):
+    theme_preference: Optional[str] = None
+
+    @field_validator("theme_preference")
+    @classmethod
+    def theme_must_be_valid(cls, v: Optional[str]) -> Optional[str]:
+        if v and v not in ["light", "dark", "system"]:
+            raise ValueError("Theme must be 'light', 'dark', or 'system'")
+        return v
+
 class MessageRequest(BaseModel):
     content: str
 
@@ -159,12 +169,39 @@ def me(current_user: User = Depends(get_current_user)):
     finally:
         db.close()
     return {
-        "id":          current_user.id,
-        "name":        current_user.name,
-        "email":       current_user.email,
-        "created_at":  current_user.created_at,
-        "total_trips": trip_count,
+        "id":                current_user.id,
+        "name":              current_user.name,
+        "email":             current_user.email,
+        "created_at":        current_user.created_at,
+        "theme_preference":  current_user.theme_preference,
+        "total_trips":       trip_count,
     }
+
+@app.patch("/api/v1/auth/preferences")
+def update_preferences(
+    request: UserPreferencesRequest,
+    current_user: User = Depends(get_current_user)
+):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == current_user.id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if request.theme_preference is not None:
+            user.theme_preference = request.theme_preference
+        
+        db.commit()
+        db.refresh(user)
+        
+        return {
+            "id":                user.id,
+            "name":              user.name,
+            "email":             user.email,
+            "theme_preference":  user.theme_preference,
+        }
+    finally:
+        db.close()
 
 @app.post("/api/v1/ask")
 def ask(request: AskRequest, current_user: User = Depends(get_current_user)):

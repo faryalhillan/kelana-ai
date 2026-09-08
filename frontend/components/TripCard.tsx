@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Trip } from "@/services/tripService";
 import Image from "next/image";
+import { ArrowRight, Trash2 } from "lucide-react";
 
 export default function TripCard({ trip, onDelete }: { trip: Trip; onDelete?: (id: number) => Promise<void> }) {
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -26,8 +27,8 @@ export default function TripCard({ trip, onDelete }: { trip: Trip; onDelete?: (i
 					<Image 
 						src={flagImage} 
 						alt={`${trip.country} flag`}
-						width={48}
-						height={48}
+						width={56}
+						height={56}
 						className="country-flag-image"
 					/>
 				) : (
@@ -50,7 +51,10 @@ export default function TripCard({ trip, onDelete }: { trip: Trip; onDelete?: (i
 				<div className="trip-card-footer">
 					<span>{trip.total_estimated_cost.toLocaleString()} {trip.currency} estimated</span>
 					<div className="trip-card-actions">
-						<Link href={`/trips/${trip.id}`}>View details <span aria-hidden="true">→</span></Link>
+						<Link href={`/trips/${trip.id}`}>
+							View details
+							<ArrowRight size={16} />
+						</Link>
 						{onDelete ? (
 							<button 
 								type="button" 
@@ -58,6 +62,7 @@ export default function TripCard({ trip, onDelete }: { trip: Trip; onDelete?: (i
 								onClick={handleDelete} 
 								disabled={isDeleting}
 							>
+								<Trash2 size={14} />
 								{isDeleting ? "Deleting…" : "Delete"}
 							</button>
 						) : null}

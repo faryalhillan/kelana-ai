@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import TripList from "@/components/TripList";
 import { apiRequest, deleteTrip, type Trip } from "@/services/tripService";
+import { Plane, AlertCircle, ArrowRight } from "lucide-react";
 
 export default function TripsPage() {
 	const router = useRouter();
@@ -47,22 +48,34 @@ export default function TripsPage() {
 			</section>
 			{isLoading ? (
 				<div className="empty-state compact">
-					<span className="empty-icon">✦</span>
+					<span className="empty-icon">
+						<Plane size={32} />
+					</span>
 					<h2>Loading your trips…</h2>
 				</div>
 			) : error ? (
 				<div className="empty-state error-state">
-					<span className="empty-icon">!</span>
+					<span className="empty-icon">
+						<AlertCircle size={32} />
+					</span>
 					<h2>We could not reach your trips.</h2>
 					<p>{error}</p>
-					<Link className="primary-link" href="/login">Try again <span aria-hidden="true">→</span></Link>
+					<Link className="primary-link" href="/login">
+						Try again
+						<ArrowRight size={18} />
+					</Link>
 				</div>
 			) : trips.length === 0 ? (
 				<div className="empty-state">
-					<span className="empty-icon">✈</span>
+					<span className="empty-icon">
+						<Plane size={32} />
+					</span>
 					<h2>No trips found.</h2>
 					<p>Create your first itinerary and give the next journey somewhere to begin.</p>
-					<Link className="primary-link" href="/#planner">Generate a trip <span aria-hidden="true">→</span></Link>
+					<Link className="primary-link" href="/planner">
+						Generate a trip
+						<ArrowRight size={18} />
+					</Link>
 				</div>
 			) : (
 				<TripList trips={trips} onDelete={removeTrip} />
