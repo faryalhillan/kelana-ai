@@ -23,6 +23,9 @@ export type Trip = {
 	travel_style: string;
 	created_at?: string;
 	ai_recommendations?: string | null;
+	country_flag?: string;
+	country_code?: string;
+	country_emoji?: string;
 };
 
 export type TripUpdate = {

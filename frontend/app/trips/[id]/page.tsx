@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
@@ -251,7 +252,33 @@ export default function TripDetailPage({ params }: Props) {
         </div>
         <div className="edit-actions"><button type="submit" className="submit-button" disabled={isSaving}>{isSaving ? (isEditing ? "Saving & regenerating..." : "Regenerating itinerary...") : "Save changes"}</button><button type="button" className="secondary-link" onClick={() => setIsEditing(false)} disabled={isSaving}>Cancel</button></div>
       </form> : null}
-    <section className="detail-hero"><div><p className="eyebrow">{trip.category} journey</p><h1>{trip.destinations.join(" · ")}</h1><p className="detail-lede">{trip.days} days in {trip.country}, designed for a {trip.travel_style.toLowerCase()}.</p></div><div className="detail-stat"><strong>{trip.budget.toLocaleString()} {trip.currency}</strong><span>total budget</span></div></section>
+    <section className="detail-hero">
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+          {trip.country_flag && (
+            <Image 
+              src={trip.country_flag} 
+              alt={`${trip.country} flag`}
+              width={56}
+              height={42}
+              className="trip-detail-flag-image"
+            />
+          )}
+          <div>
+            <p className="eyebrow" style={{ margin: 0 }}>{trip.category} journey</p>
+            <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: '14px', fontWeight: '600' }}>
+              {trip.country}
+            </p>
+          </div>
+        </div>
+        <h1>{trip.destinations.join(" · ")}</h1>
+        <p className="detail-lede">{trip.days} days in {trip.country}, designed for a {trip.travel_style.toLowerCase()}.</p>
+      </div>
+      <div className="detail-stat">
+        <strong>{trip.budget.toLocaleString()} {trip.currency}</strong>
+        <span>total budget</span>
+      </div>
+    </section>
     <section className="trip-facts"><div><span>Destination</span><strong>{trip.country}</strong></div><div><span>Daily budget</span><strong>{trip.daily_budget.toLocaleString()} {trip.currency}</strong></div><div><span>Transport</span><strong>{trip.recommendation_transport}</strong></div><div><span>Estimate</span><strong className={trip.budget_exceeded ? "over-budget" : ""}>{trip.total_estimated_cost.toLocaleString()} {trip.currency}</strong></div></section>
       {recommendation ? <section className="detail-itinerary"><div className="detail-section-heading"><p className="eyebrow">AI RECOMMENDATION</p><h2>{recommendation.title}</h2></div><DayCards days={recommendation.daily_itinerary} currency={trip.currency} /></section> : <div className="empty-state compact"><span className="empty-icon">✦</span><h2>Your itinerary is waiting.</h2><p>The trip is saved. Generate its AI recommendations from the planner when you are ready.</p><Link className="primary-link" href="/#planner">Open planner <span aria-hidden="true">→</span></Link></div>}
       

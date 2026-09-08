@@ -178,6 +178,33 @@ def ask(request: AskRequest, current_user: User = Depends(get_current_user)):
         "source": result["source"],
     }
 
+# ── Country data endpoint ─────────────────────────────────────────────────────
+
+@app.get("/api/v1/countries")
+async def list_countries():
+    """
+    Get list of all countries with flags for dropdown.
+    """
+    from services.country_service import get_all_countries
+    
+    countries = await get_all_countries()
+    return countries
+
+@app.get("/api/v1/countries/{country_name}")
+async def get_country(country_name: str):
+    """
+    Fetch country data including flag from RestCountries API with caching.
+    """
+    from services.country_service import get_country_data
+    
+    country_data = await get_country_data(country_name)
+    if not country_data:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Country data not found for: {country_name}"
+        )
+    return country_data
+
 # ── Protected conversation endpoints ─────────────────────────────────────────
 
 @app.post("/api/v1/conversations", status_code=201)
@@ -410,15 +437,62 @@ def create_trip(
         db.close()
 
 @app.get("/api/v1/trips")
-def list_trips(current_user: User = Depends(get_current_user)):
+async def list_trips(current_user: User = Depends(get_current_user)):
+    from services.country_service import get_country_data
+    
     db = SessionLocal()
     try:
-        return db.query(Trip).filter(Trip.user_id == current_user.id).all()
+        trips = db.query(Trip).filter(Trip.user_id == current_user.id).all()
+        
+        # Enrich trips with country data
+        enriched_trips = []
+        for trip in trips:
+            trip_dict = {
+                "id": trip.id,
+                "user_id": trip.user_id,
+                "destinations": trip.destinations,
+                "country": trip.country,
+                "days": trip.days,
+                "budget": trip.budget,
+                "hotel_cost": trip.hotel_cost,
+                "transportation_cost": trip.transportation_cost,
+                "food_cost": trip.food_cost,
+                "miscellaneous_cost": trip.miscellaneous_cost,
+                "total_estimated_cost": trip.total_estimated_cost,
+                "budget_exceeded": trip.budget_exceeded,
+                "currency": trip.currency,
+                "travel_month": trip.travel_month,
+                "category": trip.category,
+                "daily_budget": trip.daily_budget,
+                "recommendation_transport": trip.recommendation_transport,
+                "season": trip.season,
+                "travel_style": trip.travel_style,
+                "created_at": trip.created_at,
+                "ai_recommendations": trip.ai_recommendations,
+                "trip_preferences": trip.trip_preferences,
+            }
+            
+            # Fetch country data
+            country_data = await get_country_data(trip.country)
+            if country_data:
+                trip_dict["country_flag"] = country_data.get("flag_png", "")
+                trip_dict["country_code"] = country_data.get("code", "")
+                trip_dict["country_emoji"] = country_data.get("flag_emoji", "🌍")
+            else:
+                trip_dict["country_flag"] = ""
+                trip_dict["country_code"] = ""
+                trip_dict["country_emoji"] = "🌍"
+            
+            enriched_trips.append(trip_dict)
+        
+        return enriched_trips
     finally:
         db.close()
 
 @app.get("/api/v1/trips/{trip_id}")
-def get_trip(trip_id: int, current_user: User = Depends(get_current_user)):
+async def get_trip(trip_id: int, current_user: User = Depends(get_current_user)):
+    from services.country_service import get_country_data
+    
     db = SessionLocal()
     try:
         trip = db.query(Trip).filter(
@@ -431,7 +505,45 @@ def get_trip(trip_id: int, current_user: User = Depends(get_current_user)):
     # handling not found
     if trip is None:
         raise HTTPException(status_code=404, detail=f"Trip {trip_id} not found")
-    return trip
+    
+    # Convert to dict and enrich with country data
+    trip_dict = {
+        "id": trip.id,
+        "user_id": trip.user_id,
+        "destinations": trip.destinations,
+        "country": trip.country,
+        "days": trip.days,
+        "budget": trip.budget,
+        "hotel_cost": trip.hotel_cost,
+        "transportation_cost": trip.transportation_cost,
+        "food_cost": trip.food_cost,
+        "miscellaneous_cost": trip.miscellaneous_cost,
+        "total_estimated_cost": trip.total_estimated_cost,
+        "budget_exceeded": trip.budget_exceeded,
+        "currency": trip.currency,
+        "travel_month": trip.travel_month,
+        "category": trip.category,
+        "daily_budget": trip.daily_budget,
+        "recommendation_transport": trip.recommendation_transport,
+        "season": trip.season,
+        "travel_style": trip.travel_style,
+        "created_at": trip.created_at,
+        "ai_recommendations": trip.ai_recommendations,
+        "trip_preferences": trip.trip_preferences,
+    }
+    
+    # Fetch country data
+    country_data = await get_country_data(trip.country)
+    if country_data:
+        trip_dict["country_flag"] = country_data.get("flag_png", "")
+        trip_dict["country_code"] = country_data.get("code", "")
+        trip_dict["country_emoji"] = country_data.get("flag_emoji", "🌍")
+    else:
+        trip_dict["country_flag"] = ""
+        trip_dict["country_code"] = ""
+        trip_dict["country_emoji"] = "🌍"
+    
+    return trip_dict
 
 @app.put("/api/v1/trips/{trip_id}")
 def update_trip(trip_id: int, request: TripRequest, current_user: User = Depends(get_current_user)):

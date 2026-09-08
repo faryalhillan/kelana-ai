@@ -1,210 +1,260 @@
 "use client";
 
-import { FormEvent, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { getAuthToken, getProfile } from "@/services/authService";
-import { apiRequest } from "@/services/tripService";
+import { getAuthToken } from "@/services/authService";
+import { 
+  MapIcon, 
+  SparklesIcon, 
+  ChatBubbleLeftRightIcon,
+  ArrowRightIcon,
+  CheckIcon,
+  GlobeAltIcon,
+  CalendarIcon,
+  CurrencyDollarIcon
+} from "@heroicons/react/24/outline";
 
-type TripResult = {
-  id: number;
-  category: string;
-  season: string;
-  daily_budget: number;
-  total_estimated_cost: number;
-  budget_exceeded: boolean;
-  recommendation_transport: string;
-};
-
-type DailyPlan = {
-  day: number;
-  title: string;
-  morning: string[];
-  afternoon: string[];
-  evening: string[];
-  estimated_cost: number;
-};
-
-type Recommendation = {
-  title: string;
-  daily_itinerary: DailyPlan[];
-  travel_tips: string[];
-  local_food_recommendations: string[];
-  estimated_budget_breakdown: Record<string, number>;
-  assumptions: string[];
-};
-
-const initialForm = {
-  destinations: "Kyoto, Osaka",
-  country: "Japan",
-  days: "7",
-  budget: "2000",
-  hotel_cost: "",
-  transportation_cost: "",
-  food_cost: "",
-  miscellaneous_cost: "",
-  currency: "USD",
-  travel_month: "October",
-  travel_style: "Cultural explorer",
-};
-
-export default function Home() {
-  const router = useRouter();
-  const [form, setForm] = useState(initialForm);
-  const [result, setResult] = useState<TripResult | null>(null);
-  const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [welcomeName, setWelcomeName] = useState("");
+export default function LandingPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const token = getAuthToken();
-    if (!token) {
-      setWelcomeName("");
-      return;
-    }
-
-    getProfile().then((profile) => setWelcomeName(profile.name)).catch(() => setWelcomeName("Traveler"));
+    setIsAuthenticated(!!getAuthToken());
   }, []);
 
-  const updateField = (field: keyof typeof initialForm, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
-
-  async function submitTrip(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSubmitting(true);
-    setError("");
-    setResult(null);
-    setRecommendation(null);
-
-    const payload = {
-      ...form,
-      destinations: form.destinations.split(",").map((place) => place.trim()).filter(Boolean),
-      days: Number(form.days),
-      budget: Number(form.budget),
-      hotel_cost: form.hotel_cost ? Number(form.hotel_cost) : null,
-      transportation_cost: form.transportation_cost ? Number(form.transportation_cost) : null,
-      food_cost: form.food_cost ? Number(form.food_cost) : null,
-      miscellaneous_cost: form.miscellaneous_cost ? Number(form.miscellaneous_cost) : null,
-    };
-
-    try {
-      const data = await apiRequest<TripResult>("/api/v1/trips", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      setResult(data);
-      const generated = await generateRecommendation(data.id);
-      if (generated) {
-        setIsSubmitting(false);
-        router.push("/trips");
-      } else {
-        setIsSubmitting(false);
-      }
-    } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : "Unable to reach the trip planner.");
-      setIsSubmitting(false);
-    }
-  }
-
-  async function generateRecommendation(tripId: number) {
-    setIsGenerating(true);
-    setError("");
-    try {
-      const data = await apiRequest<{ recommendation: Recommendation }>(`/api/v1/trips/${tripId}/generate`, {
-        method: "POST",
-      });
-      setRecommendation(data.recommendation as Recommendation);
-      return true;
-    } catch (generationError) {
-      setError(generationError instanceof Error ? generationError.message : "Unable to generate the itinerary.");
-      return false;
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  const input = (field: keyof typeof initialForm, label: string, type = "text", placeholder = "", optional = false) => (
-    <label className="field">
-      <span>{label}{optional ? <small className="optional-label">(optional)</small> : <b className="required-mark" aria-label="required">*</b>}</span>
-      <input required={!optional} value={form[field]} type={type} placeholder={placeholder} onChange={(event) => updateField(field, event.target.value)} />
-    </label>
-  );
-
   return (
-    <main className="planner-shell">
-      <Navbar active="planner" />
-      {welcomeName ? (
-        <div className="welcome-banner" aria-live="polite">
-          Welcome back, {welcomeName} 👋
+    <div className="min-h-screen bg-[var(--paper)]">
+      <Navbar />
+      
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 -z-10">
+          <Image
+            src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=2400&q=85"
+            alt="Beautiful travel destination"
+            fill
+            className="object-cover opacity-[0.15]"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--paper)] via-[var(--paper)]/95 to-[var(--paper)]" />
         </div>
-      ) : null}
-      <section className="hero-banner relative isolate flex min-h-[360px] items-end overflow-hidden rounded-[2rem] p-6 text-white md:min-h-[430px] md:p-10">
-        <Image className="absolute inset-0 -z-20 h-full w-full object-cover" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1800&q=85" alt="Traditional Kyoto street surrounded by autumn trees" fill priority sizes="(max-width: 760px) 100vw, 1100px" />
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(15,35,30,.82),rgba(15,35,30,.18))]" />
-        <div className="max-w-2xl">
-          <p className="eyebrow text-[#f4a28d]">TRIP DESIGN STUDIO <span>✦</span></p>
-          <h1 className="mb-5 max-w-xl text-5xl leading-[.98] tracking-[-.06em] md:text-7xl">Plan somewhere<br /><em>worth remembering.</em></h1>
-          <p className="max-w-md text-base leading-7 text-white/80">Tell us what moves you. We&apos;ll turn the details into a trip with a little more soul.</p>
+        
+        <div className="max-w-7xl mx-auto px-6 md:px-12 pt-20 md:pt-32 pb-24 md:pb-32">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 mb-8 bg-[var(--mint)] border border-[var(--line)] rounded-full">
+              <SparklesIcon className="w-4 h-4 text-[var(--coral)]" />
+              <span className="text-sm font-semibold text-[var(--ink)]">AI-Powered Travel Planning</span>
+            </div>
+            
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-[var(--ink)] mb-6 leading-tight">
+              Plan trips worth <br />
+              <span className="text-[var(--coral)] italic font-serif">remembering</span>
+            </h1>
+            
+            <p className="text-xl md:text-2xl text-[var(--muted)] mb-10 max-w-2xl mx-auto leading-relaxed">
+              Tell us what moves you. We&apos;ll turn your ideas into a personalized itinerary with AI that understands, creates, and refines your perfect journey.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link 
+                href={isAuthenticated ? "/planner" : "/register"}
+                className="inline-flex items-center gap-2 px-8 py-4 bg-[var(--coral)] text-white font-semibold rounded-xl hover:bg-[#d86447] transition-all hover:shadow-lg hover:-translate-y-0.5 text-lg"
+              >
+                Start Planning Free
+                <ArrowRightIcon className="w-5 h-5" />
+              </Link>
+              <Link 
+                href="#how-it-works"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[var(--ink)] font-semibold rounded-xl border-2 border-[var(--line)] hover:border-[var(--coral)] transition-all text-lg"
+              >
+                See How It Works
+              </Link>
+            </div>
+            
+            <div className="mt-12 flex items-center justify-center gap-8 text-sm text-[var(--muted)]">
+              <div className="flex items-center gap-2">
+                <CheckIcon className="w-5 h-5 text-green-600" />
+                <span>No credit card required</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckIcon className="w-5 h-5 text-green-600" />
+                <span>Free to use</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <form id="planner" className="trip-form mt-8 md:mt-12" onSubmit={submitTrip}>
-        <div className="form-column">
-          <div className="section-heading"><span>01</span><div><h2>Where to?</h2><p>Choose one or several places to explore.</p></div></div>
-          <div className="destination-grid">
-            {input("destinations", "Destinations", "text", "Tokyo, Kyoto, ...")}
-            {input("country", "Country", "text", "Japan")}
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-6 md:px-12">
+          <div className="text-center mb-16">
+            <p className="text-sm font-bold text-[var(--coral)] uppercase tracking-wider mb-3">How It Works</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-[var(--ink)] mb-4 font-serif">
+              Your perfect trip in 4 simple steps
+            </h2>
+            <p className="text-xl text-[var(--muted)] max-w-2xl mx-auto">
+              From inspiration to itinerary in minutes
+            </p>
           </div>
-          <div className="section-heading"><span>02</span><div><h2>Shape the journey</h2><p>Set the pace and personality of your adventure.</p></div></div>
-          <div className="journey-grid">
-            {input("days", "Days", "number")}
-            <label className="field"><span>Travel month<b className="required-mark" aria-label="required">*</b></span><select required value={form.travel_month} onChange={(event) => updateField("travel_month", event.target.value)}>{["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((month) => <option key={month}>{month}</option>)}</select></label>
-            <label className="field field-wide"><span>Travel style<b className="required-mark" aria-label="required">*</b></span><select required value={form.travel_style} onChange={(event) => updateField("travel_style", event.target.value)}>{["Cultural explorer", "Slow & local", "Outdoor adventure", "Food & nightlife", "Luxury escape"].map((style) => <option key={style}>{style}</option>)}</select></label>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              {
+                step: "01",
+                title: "Tell Us Your Vision",
+                description: "Share your destinations, travel style, budget, and preferences. The more you tell us, the better we create.",
+                icon: ChatBubbleLeftRightIcon
+              },
+              {
+                step: "02",
+                title: "AI Generates Your Plan",
+                description: "Our AI analyzes thousands of travel insights to craft a personalized day-by-day itinerary just for you.",
+                icon: SparklesIcon
+              },
+              {
+                step: "03",
+                title: "Refine with AI Chat",
+                description: "Chat with AI to adjust activities, timing, or budget. Get instant recommendations and local tips.",
+                icon: ChatBubbleLeftRightIcon
+              },
+              {
+                step: "04",
+                title: "Save & Access Anywhere",
+                description: "Your trip is saved to your account. Access it anytime, share with travel companions, or export it.",
+                icon: MapIcon
+              }
+            ].map((item, index) => (
+              <div key={index} className="relative">
+                <div className="bg-[var(--mint)] rounded-2xl p-8 h-full border border-[var(--line)] hover:border-[var(--coral)] transition-all hover:shadow-lg">
+                  <div className="inline-flex items-center justify-center w-14 h-14 bg-[var(--coral)] text-white rounded-xl mb-6">
+                    <item.icon className="w-7 h-7" />
+                  </div>
+                  <div className="text-sm font-bold text-[var(--coral)] mb-2">STEP {item.step}</div>
+                  <h3 className="text-xl font-bold text-[var(--ink)] mb-3">{item.title}</h3>
+                  <p className="text-[var(--muted)] leading-relaxed">{item.description}</p>
+                </div>
+                {index < 3 && (
+                  <div className="hidden lg:block absolute top-1/2 -right-4 transform -translate-y-1/2 z-10">
+                    <ArrowRightIcon className="w-8 h-8 text-[var(--coral)] opacity-30" />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
+      </section>
 
-        <aside className="budget-panel">
-          <div className="section-heading"><span>03</span><div><h2>Set your budget</h2><p>Give us the numbers. We&apos;ll make them work.</p></div></div>
-          <div className="budget-total">{input("budget", "Total budget", "number")}<label className="currency-select"><span>Currency<b className="required-mark" aria-label="required">*</b></span><select required value={form.currency} onChange={(event) => updateField("currency", event.target.value)}><option>USD</option><option>IDR</option><option>EUR</option><option>SGD</option></select></label></div>
-          <div className="cost-list">
-            {input("hotel_cost", "Hotels", "number", "0", true)}
-            {input("transportation_cost", "Getting around", "number", "0", true)}
-            {input("food_cost", "Food & drinks", "number", "0", true)}
-            {input("miscellaneous_cost", "Extras", "number", "0", true)}
+      {/* Features Section */}
+      <section id="features" className="py-24 bg-gradient-to-b from-white to-[var(--paper)]">
+        <div className="max-w-7xl mx-auto px-6 md:px-12">
+          <div className="text-center mb-16">
+            <p className="text-sm font-bold text-[var(--coral)] uppercase tracking-wider mb-3">Features</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-[var(--ink)] mb-4 font-serif">
+              Everything you need to plan
+            </h2>
+            <p className="text-xl text-[var(--muted)] max-w-2xl mx-auto">
+              Powerful AI tools to create, refine, and perfect your travel experience
+            </p>
           </div>
-          <button className="submit-button" type="submit" disabled={isSubmitting}>{isSubmitting ? (isGenerating ? "Creating your itinerary..." : "Saving your trip...") : "Generate my trip  →"}</button>
-          {error && <p className="status error">{error}</p>}
-          {result && <div className="result"><p className="eyebrow">TRIP #{result.id} IS READY</p><h3>{result.category} in {result.season}</h3><p>{result.recommendation_transport}. Your estimated total is {result.total_estimated_cost.toLocaleString()} {form.currency}, or {result.daily_budget.toLocaleString()} per day.</p>{result.budget_exceeded && <strong>This plan is above your budget.</strong>}{isGenerating && <div className="loading-card"><span className="spinner" /><div><strong>Generating your itinerary</strong><p>Bedrock is finding the good stuff.</p></div></div>}{error && !isGenerating && <button className="retry-button" type="button" onClick={() => generateRecommendation(result.id)}>Try generating again</button>}</div>}
-        </aside>
-      </form>
-      {recommendation && <section id="itinerary" className="recommendation"><div className="recommendation-header"><div><p className="eyebrow">YOUR KELANAAI ITINERARY</p><h2>{recommendation.title || "A trip made for you."}</h2></div><div style={{ display: "flex", gap: "10px", alignItems: "center" }}><span>{form.days} DAYS · {form.country.toUpperCase()}</span><button type="button" className="copy-itinerary-button" onClick={() => {
-        const itineraryText = `${recommendation.title}\n\n${recommendation.daily_itinerary.map(day => `Day ${day.day}: ${day.title}\nMorning: ${day.morning.join(", ")}\nAfternoon: ${day.afternoon.join(", ")}\nEvening: ${day.evening.join(", ")}\nEstimated cost: ${day.estimated_cost} ${form.currency}\n`).join("\n")}\n\nTravel Tips:\n${recommendation.travel_tips.join("\n")}\n\nLocal Food:\n${recommendation.local_food_recommendations.join("\n")}`;
-        navigator.clipboard.writeText(itineraryText).then(() => {
-          alert("Itinerary copied to clipboard!");
-        }).catch(() => {
-          alert("Failed to copy itinerary");
-        });
-      }}>📋 Copy</button><button type="button" className="copy-itinerary-button" onClick={() => {
-        const shareData = {
-          title: recommendation.title || "My Travel Itinerary",
-          text: `Check out my ${form.days}-day trip to ${form.country} planned with KelanaAI!`,
-          url: window.location.href
-        };
-        if (navigator.share) {
-          navigator.share(shareData).catch(() => {});
-        } else {
-          alert("Sharing not supported on this browser");
-        }
-      }}>🔗 Share</button></div></div><div className="daily-grid">{recommendation.daily_itinerary.map((day) => <article className="daily-card" key={day.day}><div className="daily-card-top"><span>DAY {day.day}</span><strong>{day.estimated_cost.toLocaleString()} {form.currency}</strong></div><h3>{day.title}</h3>{[["Morning", day.morning], ["Afternoon", day.afternoon], ["Evening", day.evening]].map(([period, activities]) => <div className="activity-block" key={period as string}><h4>{period as string}</h4>{(activities as string[]).map((activity) => <p key={activity}>{activity}</p>)}</div>)}</article>)}</div><div className="recommendation-grid detail-grid"><article className="recommendation-card"><h3>Travel tips</h3>{recommendation.travel_tips.map((tip) => <p key={tip}>{tip}</p>)}</article><article className="recommendation-card"><h3>Local food</h3>{recommendation.local_food_recommendations.map((food) => <p key={food}>{food}</p>)}</article><article className="recommendation-card"><h3>Budget breakdown</h3>{Object.entries(recommendation.estimated_budget_breakdown).map(([label, amount]) => <p className="budget-line" key={label}><span>{label.replaceAll("_", " ")}</span><strong>{amount.toLocaleString()} {form.currency}</strong></p>)}</article><article className="recommendation-card"><h3>Assumptions</h3>{recommendation.assumptions.map((assumption) => <p key={assumption}>{assumption}</p>)}</article></div></section>}
+
+          <div className="grid lg:grid-cols-3 gap-8">
+            {[
+              {
+                title: "Trip Planner",
+                description: "Create comprehensive itineraries with daily schedules, activities, and budget breakdowns. Our AI considers your preferences, travel style, and constraints.",
+                icon: MapIcon,
+                features: ["Day-by-day itineraries", "Budget optimization", "Local recommendations", "Travel tips"],
+                link: "/planner"
+              },
+              {
+                title: "Ask AI",
+                description: "Get instant answers to your travel questions. From visa requirements to best local restaurants, our AI knowledge base has you covered.",
+                icon: SparklesIcon,
+                features: ["Travel Q&A", "Destination insights", "Cultural tips", "Safety advice"],
+                link: "/assistant"
+              },
+              {
+                title: "AI Chat",
+                description: "Have a conversation about your trip. Refine your itinerary, explore alternatives, and get personalized suggestions in real-time.",
+                icon: ChatBubbleLeftRightIcon,
+                features: ["Real-time refinement", "Alternative suggestions", "Budget adjustments", "Activity swaps"],
+                link: "/chat"
+              }
+            ].map((feature, index) => (
+              <div key={index} className="bg-white rounded-2xl p-8 border border-[var(--line)] hover:border-[var(--coral)] transition-all hover:shadow-xl group">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[var(--coral)] to-[#d86447] text-white rounded-2xl mb-6 group-hover:scale-110 transition-transform">
+                  <feature.icon className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-bold text-[var(--ink)] mb-4">{feature.title}</h3>
+                <p className="text-[var(--muted)] mb-6 leading-relaxed">{feature.description}</p>
+                <ul className="space-y-3 mb-6">
+                  {feature.features.map((item, i) => (
+                    <li key={i} className="flex items-center gap-2 text-sm text-[var(--ink)]">
+                      <CheckIcon className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link 
+                  href={feature.link}
+                  className="inline-flex items-center gap-2 text-[var(--coral)] font-semibold hover:gap-3 transition-all"
+                >
+                  Try it now
+                  <ArrowRightIcon className="w-4 h-4" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof / Stats */}
+      <section className="py-20 bg-white border-y border-[var(--line)]">
+        <div className="max-w-7xl mx-auto px-6 md:px-12">
+          <div className="grid md:grid-cols-3 gap-12 text-center">
+            {[
+              { icon: GlobeAltIcon, value: "150+", label: "Countries Covered" },
+              { icon: CalendarIcon, value: "10K+", label: "Trips Planned" },
+              { icon: CurrencyDollarIcon, value: "Free", label: "Always Free to Use" }
+            ].map((stat, index) => (
+              <div key={index} className="flex flex-col items-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-[var(--mint)] rounded-full mb-4">
+                  <stat.icon className="w-8 h-8 text-[var(--coral)]" />
+                </div>
+                <div className="text-4xl md:text-5xl font-bold text-[var(--ink)] mb-2">{stat.value}</div>
+                <div className="text-[var(--muted)] font-medium">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-24 bg-gradient-to-br from-[var(--mint)] to-white">
+        <div className="max-w-4xl mx-auto px-6 md:px-12 text-center">
+          <h2 className="text-4xl md:text-5xl font-bold text-[var(--ink)] mb-6 font-serif">
+            Ready to plan your next adventure?
+          </h2>
+          <p className="text-xl text-[var(--muted)] mb-10 max-w-2xl mx-auto">
+            Join thousands of travelers who trust KelanaAI to create unforgettable journeys. Start planning for free today.
+          </p>
+          <Link 
+            href={isAuthenticated ? "/planner" : "/register"}
+            className="inline-flex items-center gap-2 px-10 py-5 bg-[var(--coral)] text-white font-bold rounded-xl hover:bg-[#d86447] transition-all hover:shadow-xl hover:-translate-y-1 text-lg"
+          >
+            Start Planning Your Trip
+            <ArrowRightIcon className="w-5 h-5" />
+          </Link>
+          <p className="mt-6 text-sm text-[var(--muted)]">
+            No credit card required • Free forever • Start in seconds
+          </p>
+        </div>
+      </section>
+
       <Footer />
-    </main>
+    </div>
   );
 }
-

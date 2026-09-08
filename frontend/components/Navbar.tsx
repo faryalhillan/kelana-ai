@@ -1,37 +1,70 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { getAuthToken, getProfile } from "@/services/authService";
+
+// Add a simple cache for user profile to avoid repeated API calls
+let profileCache: { name: string; timestamp: number } | null = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export default function Navbar({ active = "" }: { active?: string }) {
 	const [authState, setAuthState] = useState<"loading" | "authenticated" | "unauthenticated">("loading");
 	const [userName, setUserName] = useState("");
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
+	const pathname = usePathname();
+	
+	// Determine if we're on the landing page
+	const isLandingPage = pathname === "/";
+
+	const checkAuth = useCallback(async () => {
+		const token = getAuthToken();
+		
+		if (!token) {
+			setAuthState("unauthenticated");
+			profileCache = null;
+			return;
+		}
+
+		// Check if we have cached profile data that's still valid
+		if (profileCache && Date.now() - profileCache.timestamp < CACHE_DURATION) {
+			setUserName(profileCache.name);
+			setAuthState("authenticated");
+			return;
+		}
+
+		try {
+			const profile = await getProfile();
+			const name = profile.name || "Traveler";
+			
+			// Cache the profile data
+			profileCache = {
+				name,
+				timestamp: Date.now()
+			};
+			
+			setUserName(name);
+			setAuthState("authenticated");
+		} catch {
+			// If profile fetch fails, still show as authenticated with fallback name
+			const fallbackName = "Traveler";
+			setUserName(fallbackName);
+			setAuthState("authenticated");
+			
+			// Cache the fallback too
+			profileCache = {
+				name: fallbackName,
+				timestamp: Date.now()
+			};
+		}
+	}, []);
 
 	useEffect(() => {
-		// Check auth immediately on mount, before render
-		const checkAuth = async () => {
-			const token = getAuthToken();
-			
-			if (!token) {
-				setAuthState("unauthenticated");
-				return;
-			}
-
-			try {
-				const profile = await getProfile();
-				setUserName(profile.name);
-				setAuthState("authenticated");
-			} catch {
-				setUserName("Traveler");
-				setAuthState("authenticated");
-			}
-		};
-
+		// Check auth immediately on mount, without delay
 		checkAuth();
-	}, []);
+	}, [checkAuth]);
 
 	// Close dropdown when clicking outside
 	useEffect(() => {
@@ -41,19 +74,22 @@ export default function Navbar({ active = "" }: { active?: string }) {
 			}
 		}
 
-		document.addEventListener("mousedown", handleClickOutside);
-		return () => document.removeEventListener("mousedown", handleClickOutside);
-	}, []);
+		if (isDropdownOpen) {
+			document.addEventListener("mousedown", handleClickOutside);
+			return () => document.removeEventListener("mousedown", handleClickOutside);
+		}
+	}, [isDropdownOpen]);
 
-	const handleLogout = () => {
+	const handleLogout = useCallback(() => {
 		setIsDropdownOpen(false);
+		profileCache = null; // Clear cache on logout
 		const { logout } = require("@/services/authService");
 		logout();
-	};
+	}, []);
 
-	const toggleDropdown = () => {
-		setIsDropdownOpen(!isDropdownOpen);
-	};
+	const toggleDropdown = useCallback(() => {
+		setIsDropdownOpen(prev => !prev);
+	}, []);
 
 	return (
 		<header className="site-nav">
@@ -64,38 +100,60 @@ export default function Navbar({ active = "" }: { active?: string }) {
 					<span>Kelana<span className="brand-accent">AI</span></span>
 				</Link>
 
-				{/* Main Navigation */}
+				{/* Main Navigation - Different links for landing vs app pages */}
 				<nav aria-label="Main navigation" className="nav-links">
-					<Link 
-						className={`nav-link ${active === "planner" ? "active" : ""}`} 
-						href="/#planner"
-					>
-						Plan a Trip
-					</Link>
-					<Link 
-						className={`nav-link ${active === "trips" ? "active" : ""}`} 
-						href="/trips"
-					>
-						My Trips
-					</Link>
-					<Link 
-						className={`nav-link ${active === "assistant" ? "active" : ""}`} 
-						href="/assistant"
-					>
-						Ask AI
-					</Link>
-					<Link 
-						className={`nav-link ${active === "chat" ? "active" : ""}`} 
-						href="/chat"
-					>
-						AI Chat
-					</Link>
+					{isLandingPage ? (
+						<>
+							<Link 
+								className={`nav-link ${active === "how-it-works" ? "active" : ""}`} 
+								href="/#how-it-works"
+							>
+								<span className="nav-link-text">How It Works</span>
+							</Link>
+							<Link 
+								className={`nav-link ${active === "features" ? "active" : ""}`} 
+								href="/#features"
+							>
+								<span className="nav-link-text">Features</span>
+							</Link>
+						</>
+					) : (
+						<>
+							<Link 
+								className={`nav-link ${active === "planner" ? "active" : ""}`} 
+								href="/planner"
+							>
+								<span className="nav-link-text">Plan a Trip</span>
+							</Link>
+							<Link 
+								className={`nav-link ${active === "trips" ? "active" : ""}`} 
+								href="/trips"
+							>
+								<span className="nav-link-text">My Trips</span>
+							</Link>
+							<Link 
+								className={`nav-link ${active === "assistant" ? "active" : ""}`} 
+								href="/assistant"
+							>
+								<span className="nav-link-text">Ask AI</span>
+							</Link>
+							<Link 
+								className={`nav-link ${active === "chat" ? "active" : ""}`} 
+								href="/chat"
+							>
+								<span className="nav-link-text">AI Chat</span>
+							</Link>
+						</>
+					)}
 				</nav>
 
 				{/* Auth Section */}
 				<div className="nav-auth">
 					{authState === "loading" ? (
-						<div className="auth-skeleton" aria-hidden="true" />
+						<div className="auth-skeleton" aria-hidden="true">
+							<div className="skeleton-avatar"></div>
+							<div className="skeleton-text"></div>
+						</div>
 					) : authState === "authenticated" ? (
 						<div className="user-dropdown" ref={dropdownRef}>
 							<button
@@ -148,7 +206,7 @@ export default function Navbar({ active = "" }: { active?: string }) {
 						</div>
 					) : (
 						<div className="auth-buttons">
-							<Link href="/login" className="auth-btn login">Login</Link>
+							<Link href="/login" className="auth-btn login">Sign In</Link>
 							<Link href="/register" className="auth-btn register">Get Started</Link>
 						</div>
 					)}
