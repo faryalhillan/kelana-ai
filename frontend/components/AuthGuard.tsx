@@ -71,11 +71,11 @@ function AuthPrompt() {
 		<div className="auth-guard-prompt">
 			<div className="auth-prompt-card">
 				<div className="auth-prompt-icon">
-					<Lock size={40} />
+					<Lock size={32} />
 				</div>
 				<h2>Sign in to continue</h2>
 				<p>
-					You need to be logged in to access this feature. Create an account or log in to start exploring personalized travel planning with KelanaAI.
+					You need to be signed in to access this feature. Join thousands of travellers planning smarter with KelanaAI.
 				</p>
 				<div className="auth-prompt-actions">
 					<Link href="/login" className="auth-prompt-button primary">
@@ -83,11 +83,11 @@ function AuthPrompt() {
 						<ArrowRight size={18} />
 					</Link>
 					<Link href="/register" className="auth-prompt-button secondary">
-						Create account
+						Create a free account
 					</Link>
 				</div>
 				<Link href="/" className="auth-prompt-back">
-					<ArrowLeft size={16} />
+					<ArrowLeft size={14} />
 					Back to home
 				</Link>
 			</div>
