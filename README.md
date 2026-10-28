@@ -6,13 +6,6 @@
 
 ---
 
-## Program
-
-MAIN 2026
-**Alkademi Foundation**
-
----
-
 ## Features
 
 - **AI Trip Generation** — Submits trip parameters (destinations, budget, days, travel style) to Amazon Bedrock (Claude); structured JSON itinerary is parsed and persisted to PostgreSQL
